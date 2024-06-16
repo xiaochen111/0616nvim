@@ -18,3 +18,9 @@ end
 require "lazy_setup"
 
 if vim.g.neovide then require("neovide").init() end
+
+
+-- 这里的原来有个插件folke/flash.nvim 现在替换到hadronized/hop.nvim 
+-- 原项目地址 https://github.com/chaozwn/astronvim_with_coc_or_mason
+-- gl 在浮动窗口中显示诊断。  maps.n["gl"] = { function() vim.diagnostic.open_float() end, desc = "Hover diagnostics" }
+

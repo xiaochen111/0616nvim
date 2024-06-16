@@ -22,5 +22,17 @@ return {
         didChangeWatchedFiles = { dynamicRegistration = true },
       },
     },
+    mappings = {
+      n = {
+        ["gdd"] = {
+           require("telescope.builtin").lsp_references
+        }
+      }
+    }
   },
 }
+
+
+-- leader fo 打开最近的文件
+-- leader ff 打开文件搜索
+-- leader fw 全局搜索文字

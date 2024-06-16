@@ -59,8 +59,8 @@ return {
       -- close search highlight
       maps.n["<Leader>nh"] = { ":nohlsearch<CR>", desc = "Close search highlight" }
 
-      maps.n["H"] = { "^", desc = "Go to start without blank" }
-      maps.n["L"] = { "$", desc = "Go to end without blank" }
+      -- maps.n["H"] = { "^", desc = "Go to start without blank" }
+      -- maps.n["L"] = { "$", desc = "Go to end without blank" }
 
       maps.v["<"] = { "<gv", desc = "Unindent line" }
       maps.v[">"] = { ">gv", desc = "Indent line" }
@@ -75,16 +75,20 @@ return {
       maps.n["<Leader>wo"] = { "<C-w>o", desc = "Close other screen" }
       -- 多个窗口之间跳转
       maps.n["<Leader>we"] = { "<C-w>=", desc = "Make all window equal" }
-      maps.n["<TAB>"] =
+      -- 上一个标签窗口
+      maps.n["R"] =
         { function() require("astrocore.buffer").nav(vim.v.count > 0 and vim.v.count or 1) end, desc = "Next buffer" }
-      maps.n["<S-TAB>"] = {
+      -- 下一个标签窗口
+      maps.n["E"] = {
         function() require("astrocore.buffer").nav(-(vim.v.count > 0 and vim.v.count or 1)) end,
         desc = "Previous buffer",
       }
-      maps.n["<Leader>bo"] =
+      -- 删除除去自己的所有窗口
+      maps.n["gxx"] =
         { function() require("astrocore.buffer").close_all(true) end, desc = "Close all buffers except current" }
       maps.n["<Leader>ba"] = { function() require("astrocore.buffer").close_all() end, desc = "Close all buffers" }
-      maps.n["<Leader>bc"] = { function() require("astrocore.buffer").close() end, desc = "Close buffer" }
+      -- 删除当前窗口
+      maps.n["<C-w>"] = { function() require("astrocore.buffer").close() end, desc = "Close buffer" }
       maps.n["<Leader>bC"] = { function() require("astrocore.buffer").close(0, true) end, desc = "Force close buffer" }
       maps.n["<Leader>bn"] = { "<cmd>tabnew<cr>", desc = "New tab" }
       maps.n["<Leader>bD"] = {
@@ -99,6 +103,40 @@ return {
       -- lsp restart
       maps.n["<Leader>lm"] = { "<Cmd>LspRestart<CR>", desc = "Lsp restart" }
       maps.n["<Leader>lg"] = { "<Cmd>LspLog<CR>", desc = "Show lsp log" }
+
+
+      maps.n["}"] = {"%"}
+      maps.n["J"] = {'5j'}
+      maps.n["K"] = {'5k'}
+      maps.n["<leader>a"] = {function ()
+        vim.cmd.Neotree "focus"
+      end}
+
+      maps.n["<leader>n"] = {"*"}
+
+      maps.n["<leader>h"] = {"^"}
+      maps.n["<leader>l"] = {"$"}
+      maps.n["<leader>j"] = {function() vim.diagnostic.goto_next() end}
+      maps.n["<leader>k"] = {function() vim.diagnostic.goto_prev() end}
+      maps.n["gj"] = {function() require('gitsigns').next_hunk() end}
+      maps.n["gk"] = {function() require('gitsigns').prev_hunk() end}
+      maps.n["gh"] = {function() vim.lsp.buf.hover() end}
+      maps.n["gr"] = {function() require("gitsigns").reset_hunk() end}
+      maps.n["<C-m>"] = {function() vim.lsp.buf.code_action() end}
+
+      maps.n["zm"] = {"zM"}
+      maps.n["zr"] = {"zR"}
+      maps.n["zo"] = {"zO"}
+      maps.n["zc"] = {"zC"}
+
+      maps.v["J"] = {'5j'}
+      maps.v["K"] = {'5k'}
+      maps.v["<leader>h"] = {"^"}
+      maps.v["<leader>l"] = {"$"}
+
+      maps.i["jj"] = {'<Esc>'}
+      maps.n["f"] = {function() require('hop').hint_char1() end}
+
     end
 
     opts.mappings = maps

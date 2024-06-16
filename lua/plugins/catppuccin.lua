@@ -24,7 +24,7 @@ return {
       alpha = true,
       cmp = true,
       dashboard = true,
-      flash = true,
+      -- flash = true,
       gitsigns = true,
       headlines = true,
       illuminate = true,

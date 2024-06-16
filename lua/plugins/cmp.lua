@@ -18,15 +18,16 @@ local function mapping(is_cmdline)
     ["<C-P>"] = cmp.mapping(function()
       if luasnip.jumpable(-1) then luasnip.jump(-1) end
     end, { "i", "c" }),
-    ["<C-K>"] = cmp.mapping(function() cmp.select_prev_item { behavior = cmp.SelectBehavior.Select } end, { "i", "c" }),
-    ["<C-J>"] = cmp.mapping(function()
+    ["K"] = cmp.mapping(function() cmp.select_prev_item { behavior = cmp.SelectBehavior.Select } end, { "i", "c" }),
+    ["J"] = cmp.mapping(function()
       if cmp.visible() then
         cmp.select_next_item { behavior = cmp.SelectBehavior.Select }
       else
+        -- 强制出现补全
         cmp.complete()
       end
     end, { "i", "c" }),
-    ["<Tab>"] = cmp.mapping(function(fallback)
+    ["<CR>"] = cmp.mapping(function(fallback)
       if is_cmdline then
         if cmp.visible() then
           cmp.confirm()
