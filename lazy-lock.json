@@ -12,6 +12,7 @@
   "astrotheme": { "branch": "main", "commit": "2bcd030c93489a02aab6cff2288e49adb0c84fad" },
   "astroui": { "branch": "main", "commit": "a79b6fc3d9b67a0a93e486801ef354967c80e9d6" },
   "auto-save.nvim": { "branch": "main", "commit": "151c00848b191b54578f7549fe3e18665eb96638" },
+  "autoclose.nvim": { "branch": "main", "commit": "dc42806540dcf448ecb2bad6b67204410cfbe629" },
   "catppuccin": { "branch": "main", "commit": "5215ea59df6d0a7e27da9a5cd1165e06d1b04cbe" },
   "cmp-buffer": { "branch": "main", "commit": "3022dbc9166796b644a841a02de8dd1cc1d311fa" },
   "cmp-calc": { "branch": "main", "commit": "5947b412da67306c5b68698a02a846760059be2e" },
