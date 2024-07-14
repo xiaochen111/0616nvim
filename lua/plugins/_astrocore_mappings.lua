@@ -133,6 +133,7 @@ return {
       maps.v["K"] = {'5k'}
       maps.v["<leader>h"] = {"^"}
       maps.v["<leader>l"] = {"$"}
+      maps.v["log"] = {function() require('utils').log_variable() end}
 
       maps.i["jj"] = {'<Esc>'}
       maps.n["f"] = {function() require('hop').hint_char1() end}

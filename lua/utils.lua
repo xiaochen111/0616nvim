@@ -142,4 +142,15 @@ function M.list_remove_unique(lst, vals)
   return lst
 end
 
+
+function M.log_variable()
+  vim.cmd('normal! "vy')
+  local var = vim.fn.getreg('v')
+  local line = string.format("console.log('%s: ', %s);", var, var)
+  -- Move to the next line and insert the console.log statement
+  vim.api.nvim_command('normal! o' .. line)
+  -- Move back to the previous line
+  vim.api.nvim_command('normal! k')
+end
+
 return M
