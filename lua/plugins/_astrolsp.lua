@@ -6,7 +6,7 @@ return {
     features = {
       -- Configuration table of features provided by AstroLSP
       autoformat = false, -- enable or disable auto formatting on start
-      inlay_hints = true, -- nvim >= 0.10
+      inlay_hints = false, -- nvim >= 0.10 这个如果开启 方法里的变量会自动给出类型提示 还是关闭了  有点太花了😅
     },
     -- Configuration options for controlling formatting with language servers
     formatting = {

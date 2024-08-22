@@ -116,6 +116,7 @@ return {
 
       maps.n["<leader>h"] = {"^"}
       maps.n["<leader>l"] = {"$"}
+      maps.n["<leader>L"] = {"$"}
       maps.n["<leader>j"] = {function() vim.diagnostic.goto_next() end}
       maps.n["<leader>k"] = {function() vim.diagnostic.goto_prev() end}
       maps.n["gj"] = {function() require('gitsigns').next_hunk() end}

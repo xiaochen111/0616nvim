@@ -34,6 +34,9 @@ return {
           },
         },
       },
+      window = {
+        position = "left",
+      }
     })
   end,
 }

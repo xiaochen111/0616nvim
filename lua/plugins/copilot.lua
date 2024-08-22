@@ -17,5 +17,7 @@ return {
   --       dismiss = "<C-]>",
   --     },
   --   },
+  --   -- copilot_node_command = vim.fn.expand("$HOME") .. "/.config/nvm/versions/node/v18.18.2/bin/node", -- Node.js version must be > 18.x
+  --   copilot_node_command = vim.fn.expand("$HOME") .. "/.nvm/versions/node/v18.16.0/bin/node", -- Node.js version must be > 18.x
   -- },
 }
