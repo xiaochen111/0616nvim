@@ -138,14 +138,22 @@ return {
   },
   {
     "williamboman/mason-lspconfig.nvim",
-    opts = function(_, opts)
-      opts.ensure_installed = utils.list_insert_unique(opts.ensure_installed, { "eslint", "vtsls" })
-    end,
+    dependencies = {
+        "williamboman/mason.nvim",
+        "neovim/nvim-lspconfig",
+    },
+    opts = {
+        ensure_installed = { "eslint", "vtsls" },
+        automatic_installation = true,
+    },
   },
   {
     "jay-babu/mason-null-ls.nvim",
     optional = true,
     opts = function(_, opts)
+      if not opts.ensure_installed then
+        opts.ensure_installed = {}
+      end
       opts.ensure_installed = require("astrocore").list_insert_unique(opts.ensure_installed, { "prettierd" })
       if not opts.handlers then opts.handlers = {} end
 
