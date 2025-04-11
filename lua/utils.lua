@@ -90,32 +90,98 @@ function M.toggle_lazy_docker()
   end
 end
 
+-- function M.toggle_lazy_git()
+--   return function()
+--     local worktree = require("astrocore").file_worktree()
+--     local flags = worktree and (" --work-tree=%s --git-dir=%s"):format(worktree.toplevel, worktree.gitdir) or ""
+--     require("astrocore").toggle_term_cmd {
+--       cmd = "lazygit " .. flags,
+--       hidden = true,
+--       on_open = function()
+--         M.remove_keymap("t", "<C-H>")
+--         M.remove_keymap("t", "<C-J>")
+--         M.remove_keymap("t", "<C-K>")
+--         M.remove_keymap("t", "<C-L>")
+--       end,
+--       on_close = function()
+--         vim.api.nvim_set_keymap("t", "<C-H>", "<cmd>wincmd h<cr>", { silent = true, noremap = true })
+--         vim.api.nvim_set_keymap("t", "<C-J>", "<cmd>wincmd j<cr>", { silent = true, noremap = true })
+--         vim.api.nvim_set_keymap("t", "<C-K>", "<cmd>wincmd k<cr>", { silent = true, noremap = true })
+--         vim.api.nvim_set_keymap("t", "<C-L>", "<cmd>wincmd l<cr>", { silent = true, noremap = true })
+--       end,
+--       on_exit = function(t, job, code, event)
+--         -- For Stop Term Mode
+--         vim.cmd [[stopinsert]]
+--       end,
+--     }
+--   end
+-- end
+--
+--
+
 function M.toggle_lazy_git()
   return function()
     local worktree = require("astrocore").file_worktree()
     local flags = worktree and (" --work-tree=%s --git-dir=%s"):format(worktree.toplevel, worktree.gitdir) or ""
-    require("astrocore").toggle_term_cmd {
-      cmd = "lazygit " .. flags,
-      hidden = true,
-      on_open = function()
-        M.remove_keymap("t", "<C-H>")
-        M.remove_keymap("t", "<C-J>")
-        M.remove_keymap("t", "<C-K>")
-        M.remove_keymap("t", "<C-L>")
+    local lazygit_cmd = "lazygit " .. flags
+
+    -- 计算浮动窗口的尺寸
+    local width = math.floor(vim.o.columns * 0.8)
+    local height = math.floor(vim.o.lines * 0.8)
+    local row = math.floor((vim.o.lines - height) / 2)
+    local col = math.floor((vim.o.columns - width) / 2)
+
+    -- 打开一个新的浮动终端窗口
+    local buf = vim.api.nvim_create_buf(false, true)
+    local win = vim.api.nvim_open_win(buf, true, {
+      relative = 'editor',
+      width = width,
+      height = height,
+      row = row,
+      col = col,
+      style = 'minimal',
+      border = 'rounded',
+    })
+
+    -- 在浮动窗口中启动 lazygit
+    vim.fn.termopen(lazygit_cmd, {
+      on_exit = function(t, job, code, event)
+        -- 关闭窗口时停止插入模式
+        vim.cmd("stopinsert")
+        vim.api.nvim_win_close(win, true)
       end,
-      on_close = function()
+    })
+
+    -- 关闭插入模式，并设置按键绑定
+    -- vim.cmd("stopinsert")
+    --
+    -- 设置窗口打开时进入插入模式
+    vim.cmd("startinsert")
+
+    -- 窗口打开时移除快捷键
+    M.remove_keymap("t", "<C-H>")
+    M.remove_keymap("t", "<C-J>")
+    M.remove_keymap("t", "<C-K>")
+    M.remove_keymap("t", "<C-L>")
+
+    -- 窗口关闭时恢复快捷键
+    vim.api.nvim_create_autocmd("BufWinLeave", {
+      buffer = buf,
+      callback = function()
         vim.api.nvim_set_keymap("t", "<C-H>", "<cmd>wincmd h<cr>", { silent = true, noremap = true })
         vim.api.nvim_set_keymap("t", "<C-J>", "<cmd>wincmd j<cr>", { silent = true, noremap = true })
         vim.api.nvim_set_keymap("t", "<C-K>", "<cmd>wincmd k<cr>", { silent = true, noremap = true })
         vim.api.nvim_set_keymap("t", "<C-L>", "<cmd>wincmd l<cr>", { silent = true, noremap = true })
       end,
-      on_exit = function(t, job, code, event)
-        -- For Stop Term Mode
-        vim.cmd [[stopinsert]]
-      end,
-    }
+    })
+
+    -- 设置关闭窗口的快捷键
+    vim.api.nvim_buf_set_keymap(buf, "t", "<C-w>", "<cmd>close<CR>", { noremap = true, silent = true })
   end
 end
+--
+
+
 
 function M.removeValueFromTable(tbl, value)
   for i, v in ipairs(tbl) do
