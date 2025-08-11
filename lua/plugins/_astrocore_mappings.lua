@@ -123,6 +123,7 @@ return {
       maps.n["gk"] = {function() require('gitsigns').prev_hunk() end}
       maps.n["gh"] = {function() vim.lsp.buf.hover() end}
       maps.n["gr"] = {function() require("gitsigns").reset_hunk() end}
+      -- maps.n["gb"] = {function() require("gitsigns").blame() end}
       -- 来预览当前光标所在的更改块。
       maps.n["gp"] = {function() require("gitsigns").preview_hunk() end}
       maps.n["<C-m>"] = {function() vim.lsp.buf.code_action() end}
