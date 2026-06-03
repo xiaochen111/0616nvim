@@ -17,6 +17,7 @@ return {
           thesaurus = vim.fn.expand "~/.config/nvim/spell/mthesaur.txt",
           wrap = true,
           scrolloff = 5,
+          timeoutlen = 50, -- 减少 leader 前缀键延迟，配合 <leader>l=$
         },
         g = {
           -- resession_enabled = true,
