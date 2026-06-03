@@ -88,7 +88,7 @@ return {
           on_attach = function()
             set_mappings({
               n = {
-                ["<Leader>la"] = {
+                ["<Leader>sa"] = {
                   function() vim.lsp.buf.code_action { context = { only = { "source", "refactor", "quickfix" } } } end,
                   desc = "Lsp All Action",
                 },

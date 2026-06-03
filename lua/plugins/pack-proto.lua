@@ -26,7 +26,7 @@ return {
       on_attach = function()
         set_mappings({
           n = {
-            ["<Leader>lc"] = {
+            ["<Leader>sc"] = {
               create_buf_config_file,
               desc = "Create Buf Config File",
             },

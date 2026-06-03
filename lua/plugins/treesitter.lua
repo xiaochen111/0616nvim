@@ -14,7 +14,7 @@ return {
       if maps then
         if is_available "nvim-treesitter" then
           -- TsInformation
-          maps.n["<Leader>lT"] = { "<cmd>TSInstallInfo<cr>", desc = "Tree sitter Information" }
+          maps.n["<Leader>si"] = { "<cmd>TSInstallInfo<cr>", desc = "Tree sitter Information" }
         end
       end
       -- telescope plugin mappings

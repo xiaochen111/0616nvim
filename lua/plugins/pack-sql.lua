@@ -26,7 +26,7 @@ return {
             callback = function()
               set_mappings({
                 n = {
-                  ["<Leader>lc"] = {
+                  ["<Leader>sc"] = {
                     create_sqlfluff_config_file,
                     desc = "Create sqlfluff config file",
                   },

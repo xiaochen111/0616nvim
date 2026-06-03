@@ -5,6 +5,12 @@ return {
   "AstroNvim/astrocore",
   ---@param opts AstroCoreOpts
   opts = function(_, opts)
+    -- 将 AstroNvim 的 Language Tools 前缀从 l 改为 s，避免与 <leader>l=$ 冲突
+    if opts._map_sections then
+      opts._map_sections.s = { desc = opts._map_sections.l and opts._map_sections.l.desc or "󰡰 Language Tools" }
+      opts._map_sections.l = nil
+    end
+
     if not opts.mappings then opts.mappings = require("astrocore").empty_map_table() end
     local maps = opts.mappings
     if maps then
@@ -100,25 +106,40 @@ return {
         desc = "Pick to close",
       }
 
-      -- lsp restart
-      maps.n["<Leader>lm"] = { "<Cmd>LspRestart<CR>", desc = "Lsp restart" }
-      maps.n["<Leader>lg"] = { "<Cmd>LspLog<CR>", desc = "Show lsp log" }
+      -- lsp restart (moved to <Leader>s prefix)
+      maps.n["<Leader>sm"] = { "<Cmd>LspRestart<CR>", desc = "Lsp restart" }
+      maps.n["<Leader>sg"] = { "<Cmd>LspLog<CR>", desc = "Show lsp log" }
+
+      -- 禁用 AstroNvim 默认的 <Leader>ld（已合并到 <Leader>s 前缀）
+      maps.n["<Leader>ld"] = false
+      -- 禁用 aerial 的 <Leader>lS Symbols outline
+      maps.n["<Leader>lS"] = false
+      -- 禁用 telescope 的 <Leader>ls/ld（合并到 <Leader>s 前缀）
+      maps.n["<Leader>ls"] = false
+      maps.n["<Leader>lD"] = false
+      -- 禁用用户插件 treesj/treesitter 的 <Leader>l 前缀映射
+      maps.n["<Leader>lt"] = false
+      maps.n["<Leader>lT"] = false
+
+      -- 重新映射到 <Leader>s 前缀
+      maps.n["<Leader>st"] = { "<Cmd>TSJToggle<CR>", desc = "Toggle Treesitter Join" }
+      maps.n["<Leader>si"] = { "<cmd>TSInstallInfo<cr>", desc = "Tree sitter Information" }
 
 
       maps.n["}"] = {"%"}
       maps.n["J"] = {'5j'}
       maps.n["K"] = {'5k'}
-      maps.n["<leader>a"] = {function ()
+      maps.n["<Leader>a"] = {function ()
         vim.cmd.Neotree "focus"
       end}
 
-      maps.n["<leader>n"] = {"*"}
+      maps.n["<Leader>n"] = {"*"}
 
-      maps.n["<leader>h"] = {"^"}
-      maps.n["<leader>l"] = {"$"}
-      maps.n["<leader>L"] = {"$"}
-      maps.n["<leader>j"] = {function() vim.diagnostic.goto_next() end}
-      maps.n["<leader>k"] = {function() vim.diagnostic.goto_prev() end}
+      maps.n["<Leader>h"] = { "^", desc = "Go to start of line" }
+      maps.n["<Leader>l"] = { "$", desc = "Go to end of line" }
+      maps.n["<Leader>L"] = { "$", desc = "Go to end of line" }
+      maps.n["<Leader>j"] = {function() vim.diagnostic.goto_next() end}
+      maps.n["<Leader>k"] = {function() vim.diagnostic.goto_prev() end}
       maps.n["gj"] = {function() require('gitsigns').next_hunk() end}
       maps.n["gk"] = {function() require('gitsigns').prev_hunk() end}
       maps.n["gh"] = {function() vim.lsp.buf.hover() end}
@@ -137,8 +158,8 @@ return {
 
       maps.v["J"] = {'5j'}
       maps.v["K"] = {'5k'}
-      maps.v["<leader>h"] = {"^"}
-      maps.v["<leader>l"] = {"$"}
+      maps.v["<Leader>h"] = { "^", desc = "Go to start of line" }
+      maps.v["<Leader>l"] = { "$", desc = "Go to end of line" }
       maps.v["log"] = {function() require('utils').log_variable() end}
 
       maps.i["jj"] = {'<Esc>'}
@@ -147,5 +168,11 @@ return {
     end
 
     opts.mappings = maps
+
+    -- 强制覆盖 timeoutlen，确保不被 AstroNvim 默认值覆盖
+    vim.defer_fn(function()
+      vim.opt.timeoutlen = 50
+      vim.opt.ttimeoutlen = 0
+    end, 200)
   end,
 }
