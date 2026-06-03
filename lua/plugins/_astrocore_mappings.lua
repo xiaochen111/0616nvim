@@ -171,7 +171,7 @@ return {
 
     -- 强制覆盖 timeoutlen，确保不被 AstroNvim 默认值覆盖
     vim.defer_fn(function()
-      vim.opt.timeoutlen = 50
+      vim.opt.timeoutlen = 800
       vim.opt.ttimeoutlen = 0
     end, 200)
   end,
