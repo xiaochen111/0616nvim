@@ -24,14 +24,19 @@ local function mapping(is_cmdline)
       if luasnip.jumpable(-1) then luasnip.jump(-1) end
     end, { "i", "c" }),
     ["K"] = cmp.mapping(function() cmp.select_prev_item { behavior = cmp.SelectBehavior.Select } end, { "i", "c" }),
-    ["J"] = cmp.mapping(function()
+    ["J"] = cmp.mapping(function(fallback)
       if cmp.visible() then
         cmp.select_next_item { behavior = cmp.SelectBehavior.Select }
       else
-        -- 强制出现补全
-        cmp.complete()
+        fallback()
       end
     end, { "i", "c" }),
+    ["<M-i>"] = cmp.mapping(function()
+      if not cmp.visible() then cmp.complete() end
+    end, { "i" }),
+    ["<D-i>"] = cmp.mapping(function()
+      if not cmp.visible() then cmp.complete() end
+    end, { "i" }),
     ["<CR>"] = cmp.mapping(function(fallback)
       if is_cmdline then
         if cmp.visible() then
@@ -40,7 +45,7 @@ local function mapping(is_cmdline)
           fallback()
         end
       else
-        if cmp.visible() and has_words_before() then
+        if cmp.visible() then
           cmp.confirm { select = true }
         else
           fallback()
