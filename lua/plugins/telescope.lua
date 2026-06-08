@@ -45,30 +45,41 @@ return {
     end,
   },
   {
-    "nvim-telescope/telescope.nvim", tag = '0.1.6',
+    "nvim-telescope/telescope.nvim",
+    tag = "0.1.6",
     dependencies = {
       "nvim-lua/popup.nvim",
       "nvim-lua/plenary.nvim",
     },
-    -- opts = function(_, opts)
-    --   local actions = require "telescope.actions"
-    --
-    --   return require("astrocore").extend_tbl(opts, {
-    --     pickers = {
-    --       find_files = {
-    --         -- dot file
-    --         hidden = true,
-    --       },
-    --       buffers = {
-    --         path_display = { "smart" },
-    --         mappings = {
-    --           i = { ["<c-d>"] = actions.delete_buffer },
-    --           n = { ["d"] = actions.delete_buffer },
-    --         },
-    --       },
-    --     },
-    --   })
-    -- end,
+    opts = function(_, opts)
+      local actions = require "telescope.actions"
+      return require("astrocore").extend_tbl(opts, {
+        defaults = {
+          file_ignore_patterns = {
+            "node_modules",
+            "dist",
+            "%.git/",
+            "target/",
+            "vendor/",
+            "build/",
+            "%.DS_Store",
+          },
+        },
+        pickers = {
+          find_files = {
+            -- dot file
+            hidden = true,
+          },
+          buffers = {
+            path_display = { "smart" },
+            mappings = {
+              i = { ["<c-d>"] = actions.delete_buffer },
+              n = { ["d"] = actions.delete_buffer },
+            },
+          },
+        },
+      })
+    end,
     -- config = function(...)
     --   local telescope = require "telescope"
     --   require "astronvim.plugins.configs.telescope"(...)
