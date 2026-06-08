@@ -143,7 +143,21 @@ return {
       maps.n["gj"] = {function() require('gitsigns').next_hunk() end}
       maps.n["gk"] = {function() require('gitsigns').prev_hunk() end}
       maps.n["gh"] = {function() vim.lsp.buf.hover() end}
-      maps.n["gr"] = {function() require("gitsigns").reset_hunk() end}
+      maps.n["gra"] = false
+      maps.x["gra"] = false
+      maps.n["grn"] = false
+      maps.n["grr"] = false
+      maps.n["gri"] = false
+      maps.n["grt"] = false
+      maps.n["grx"] = false
+      maps.n["gr"] = {
+        function()
+          local line = vim.api.nvim_win_get_cursor(0)[1]
+          require("gitsigns").reset_hunk { line, line }
+        end,
+        desc = "Reset git change at current line",
+        nowait = true,
+      }
       -- maps.n["gb"] = {function() require("gitsigns").blame() end}
       -- 来预览当前光标所在的更改块。
       maps.n["gp"] = {function() require("gitsigns").preview_hunk() end}
@@ -168,6 +182,20 @@ return {
     end
 
     opts.mappings = maps
+
+    vim.schedule(function()
+      for _, mode_lhs in ipairs {
+        { "n", "gra" },
+        { "x", "gra" },
+        { "n", "grn" },
+        { "n", "grr" },
+        { "n", "gri" },
+        { "n", "grt" },
+        { "n", "grx" },
+      } do
+        pcall(vim.keymap.del, mode_lhs[1], mode_lhs[2])
+      end
+    end)
 
     -- 强制覆盖 timeoutlen，确保不被 AstroNvim 默认值覆盖
     vim.defer_fn(function()
