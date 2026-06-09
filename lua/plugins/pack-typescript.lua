@@ -142,10 +142,13 @@ return {
         "williamboman/mason.nvim",
         "neovim/nvim-lspconfig",
     },
-    opts = {
-        ensure_installed = { "eslint", "vtsls" },
-        automatic_installation = true,
-    },
+    opts = function(_, opts)
+      opts.ensure_installed = require("astrocore").list_insert_unique(opts.ensure_installed or {}, { "eslint", "vtsls" })
+      opts.automatic_installation = true
+      opts.handlers = opts.handlers or {}
+      -- Prefer vtsls for TS/JS and prevent Mason from auto-setting up ts_ls
+      opts.handlers.ts_ls = function() end
+    end,
   },
   {
     "jay-babu/mason-null-ls.nvim",
@@ -227,6 +230,5 @@ return {
   {
     "bennypowers/template-literal-comments.nvim",
     ft = { "javascript", "typescript" },
-    config = true,
   },
 }
