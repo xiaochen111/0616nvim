@@ -30,6 +30,9 @@ return {
         -- 没想这里可以把AstroNvim的默认gd覆盖掉 那么我先把我原来的gdd给注释掉
         ["gd"] = {
            require("telescope.builtin").lsp_references
+        },
+        ["gI"] = {
+           vim.lsp.buf.implementation
         }
       }
     }
