@@ -219,4 +219,36 @@ function M.log_variable()
   vim.api.nvim_command('normal! k')
 end
 
+function M.copy_to_osc52(text)
+  local encoded = vim.fn.system("base64 -w0", text)
+  encoded = vim.fn.trim(encoded)
+  io.stderr:write(string.format("\027]52;c;%s\027\\", encoded))
+end
+
+function M.lsp_buf_debug()
+  local bufnr = vim.api.nvim_get_current_buf()
+  local lines = {
+    ("bufnr: %d"):format(bufnr),
+    ("name: %s"):format(vim.api.nvim_buf_get_name(bufnr)),
+    ("filetype: %s"):format(vim.bo[bufnr].filetype),
+  }
+  local clients = vim.lsp.get_clients { bufnr = bufnr }
+  lines[#lines + 1] = ("clients: %d"):format(#clients)
+
+  for _, client in ipairs(clients) do
+    local root_dir = client.config.root_dir
+    if type(root_dir) == "function" then root_dir = "<function>" end
+    lines[#lines + 1] = string.format(
+      "- %s | codeAction=%s | root_dir=%s",
+      client.name,
+      tostring(client:supports_method "textDocument/codeAction"),
+      root_dir or "nil"
+    )
+  end
+
+  if #clients == 0 then lines[#lines + 1] = "- no LSP clients attached" end
+
+  vim.notify(table.concat(lines, "\n"), vim.log.levels.INFO, { title = "LSP Buffer Debug" })
+end
+
 return M

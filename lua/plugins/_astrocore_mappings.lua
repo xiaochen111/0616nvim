@@ -178,7 +178,7 @@ return {
       maps.n["gb"] = { toggle_gitsigns_blame, desc = "Toggle gitsigns blame", nowait = true }
       -- 来预览当前光标所在的更改块。
       maps.n["gp"] = {function() require("gitsigns").preview_hunk() end}
-      maps.n["<C-m>"] = {function() vim.lsp.buf.code_action() end}
+      maps.n["<C-m>"] = false
 
       maps.n["zm"] = {"zM"}
       maps.n["zr"] = {"zR"}

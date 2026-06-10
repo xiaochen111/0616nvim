@@ -2,6 +2,12 @@ return {
   "AstroNvim/astrocore",
   ---@type AstroCoreOpts
   opts = {
+    commands = {
+      LspBufDebug = {
+        function() require("utils").lsp_buf_debug() end,
+        desc = "Show current buffer LSP debug info",
+      },
+    },
     autocmds = {
       auto_turnoff_paste = {
         event = "InsertLeave",
