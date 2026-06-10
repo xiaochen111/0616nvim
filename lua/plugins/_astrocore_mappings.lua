@@ -1,6 +1,23 @@
 local utils = require "utils"
 local system = vim.loop.os_uname().sysname
 
+local function find_gitsigns_blame_win()
+  for _, win in ipairs(vim.api.nvim_list_wins()) do
+    local buf = vim.api.nvim_win_get_buf(win)
+    if vim.bo[buf].filetype == "gitsigns-blame" then return win, buf end
+  end
+end
+
+local function toggle_gitsigns_blame()
+  local blame_win = find_gitsigns_blame_win()
+  if blame_win and vim.api.nvim_win_is_valid(blame_win) then
+    vim.api.nvim_win_close(blame_win, true)
+    return
+  end
+
+  require("gitsigns").blame()
+end
+
 return {
   "AstroNvim/astrocore",
   ---@param opts AstroCoreOpts
@@ -158,7 +175,7 @@ return {
         desc = "Reset git change at current line",
         nowait = true,
       }
-      -- maps.n["gb"] = {function() require("gitsigns").blame() end}
+      maps.n["gb"] = { toggle_gitsigns_blame, desc = "Toggle gitsigns blame", nowait = true }
       -- 来预览当前光标所在的更改块。
       maps.n["gp"] = {function() require("gitsigns").preview_hunk() end}
       maps.n["<C-m>"] = {function() vim.lsp.buf.code_action() end}
@@ -202,5 +219,29 @@ return {
       vim.opt.timeoutlen = 800
       vim.opt.ttimeoutlen = 0
     end, 200)
+
+    vim.api.nvim_create_autocmd("FileType", {
+      pattern = "gitsigns-blame",
+      callback = function(args)
+        vim.keymap.set("n", "<Esc>", "<Cmd>close<CR>", {
+          buffer = args.buf,
+          silent = true,
+          desc = "Close gitsigns blame window",
+        })
+      end,
+    })
+
+    vim.api.nvim_create_autocmd("User", {
+      pattern = "VeryLazy",
+      once = true,
+      callback = function()
+        pcall(vim.keymap.del, "n", "gb")
+        vim.keymap.set("n", "gb", toggle_gitsigns_blame, {
+          desc = "Toggle gitsigns blame",
+          nowait = true,
+          silent = true,
+        })
+      end,
+    })
   end,
 }
