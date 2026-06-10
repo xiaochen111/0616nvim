@@ -17,14 +17,48 @@ local function mapping(is_cmdline)
     end, { "i", "c" }),
     -- ctrl + e close cmp window
     -- <C-n> and <C-p> for navigating snippets
-    ["<C-N>"] = cmp.mapping(function()
-      if luasnip.jumpable(1) then luasnip.jump(1) end
+    ["<C-N>"] = cmp.mapping(function(fallback)
+      if is_cmdline then
+        if cmp.visible() then
+          cmp.select_next_item { behavior = cmp.SelectBehavior.Select }
+        else
+          fallback()
+        end
+      elseif luasnip.jumpable(1) then
+        luasnip.jump(1)
+      else
+        fallback()
+      end
     end, { "i", "c" }),
-    ["<C-P>"] = cmp.mapping(function()
-      if luasnip.jumpable(-1) then luasnip.jump(-1) end
+    ["<C-P>"] = cmp.mapping(function(fallback)
+      if is_cmdline then
+        if cmp.visible() then
+          cmp.select_prev_item { behavior = cmp.SelectBehavior.Select }
+        else
+          fallback()
+        end
+      elseif luasnip.jumpable(-1) then
+        luasnip.jump(-1)
+      else
+        fallback()
+      end
     end, { "i", "c" }),
     ["K"] = cmp.mapping(function() cmp.select_prev_item { behavior = cmp.SelectBehavior.Select } end, { "i", "c" }),
     ["J"] = cmp.mapping(function(fallback)
+      if cmp.visible() then
+        cmp.select_next_item { behavior = cmp.SelectBehavior.Select }
+      else
+        fallback()
+      end
+    end, { "i", "c" }),
+    ["<Up>"] = cmp.mapping(function(fallback)
+      if cmp.visible() then
+        cmp.select_prev_item { behavior = cmp.SelectBehavior.Select }
+      else
+        fallback()
+      end
+    end, { "i", "c" }),
+    ["<Down>"] = cmp.mapping(function(fallback)
       if cmp.visible() then
         cmp.select_next_item { behavior = cmp.SelectBehavior.Select }
       else
