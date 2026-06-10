@@ -1,3 +1,58 @@
+local ts_definition_filetypes = {
+  "javascript",
+  "typescript",
+}
+
+local ts_source_definition_filetypes = {
+  "javascriptreact",
+  "typescriptreact",
+}
+
+local function goto_source_definition_or_implementation()
+  local bufnr = vim.api.nvim_get_current_buf()
+  local filetype = vim.bo[bufnr].filetype
+
+  if vim.tbl_contains(ts_definition_filetypes, filetype) then
+    return vim.lsp.buf.definition()
+  end
+
+  if not vim.tbl_contains(ts_source_definition_filetypes, filetype) then
+    return vim.lsp.buf.implementation()
+  end
+
+  local fallback = vim.lsp.buf.definition
+  local clients = vim.lsp.get_clients { bufnr = bufnr }
+  local source_definition_client, command
+
+  for _, client in ipairs(clients) do
+    if client:supports_method "workspace/executeCommand" then
+      if client.name == "vtsls" then
+        source_definition_client = client
+        command = "typescript.goToSourceDefinition"
+        break
+      elseif client.name == "ts_ls" or client.name == "tsserver" then
+        source_definition_client = client
+        command = "_typescript.goToSourceDefinition"
+      end
+    end
+  end
+
+  if not source_definition_client or not command then return fallback() end
+
+  local params = vim.lsp.util.make_position_params()
+  source_definition_client:request("workspace/executeCommand", {
+    command = command,
+    arguments = { params.textDocument.uri, params.position },
+  }, function(err, result, ctx)
+    if err or not result or vim.tbl_isempty(result) then return fallback() end
+
+    local handler = vim.lsp.handlers["textDocument/definition"]
+    if handler then return handler(nil, result, ctx) end
+
+    return vim.lsp.util.jump_to_location(result[1], source_definition_client.offset_encoding)
+  end, bufnr)
+end
+
 ---@type LazySpec
 return {
   "AstroNvim/astrolsp",
@@ -27,14 +82,12 @@ return {
         -- ["gdd"] = {
         --    require("telescope.builtin").lsp_references
         -- },
-        -- 没想这里可以把AstroNvim的默认gd覆盖掉 那么我先把我原来的gdd给注释掉
         ["gd"] = {
-           require("telescope.builtin").lsp_references,
-           cond = "textDocument/references",
+           vim.lsp.buf.definition,
+           cond = "textDocument/definition",
         },
         ["gI"] = {
-           vim.lsp.buf.implementation,
-           cond = "textDocument/implementation",
+           goto_source_definition_or_implementation,
         }
       }
     }
