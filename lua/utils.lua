@@ -129,15 +129,36 @@ function M.find_right_claude_window(from_win)
   return right_claude
 end
 
+function M.find_nearest_right_window(from_win)
+  if not (from_win and vim.api.nvim_win_is_valid(from_win)) then return nil end
+  local from_pos = vim.api.nvim_win_get_position(from_win)
+  local right_win, right_col
+
+  for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+    if win ~= from_win and vim.api.nvim_win_is_valid(win) then
+      local pos = vim.api.nvim_win_get_position(win)
+      if pos[2] > from_pos[2] and (not right_col or pos[2] < right_col) then
+        right_win = win
+        right_col = pos[2]
+      end
+    end
+  end
+
+  return right_win
+end
+
 function M.focus_right_claude_or_window()
-  local target = M.find_right_claude_window(vim.api.nvim_get_current_win())
-  if target then
-    vim.api.nvim_set_current_win(target)
-    vim.cmd "startinsert"
+  local target = M.find_nearest_right_window(vim.api.nvim_get_current_win())
+  if not target then
+    vim.cmd "wincmd l"
     return
   end
 
-  vim.cmd "wincmd l"
+  vim.api.nvim_set_current_win(target)
+  if M.is_claude_window(target) then
+    vim.api.nvim_set_current_win(target)
+    vim.cmd "startinsert"
+  end
 end
 
 function M.toggle_lazy_docker()
