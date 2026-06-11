@@ -112,6 +112,7 @@ return {
       maps.n["<Leader>ba"] = { function() require("astrocore.buffer").close_all() end, desc = "Close all buffers" }
       -- 删除当前窗口
       maps.n["<C-w>"] = { function() require("astrocore.buffer").close() end, desc = "Close buffer" }
+      maps.n["X"] = { function() require("astrocore.buffer").close() end, desc = "Close current buffer" }
       maps.n["<Leader>bC"] = { function() require("astrocore.buffer").close(0, true) end, desc = "Force close buffer" }
       maps.n["<Leader>bn"] = { "<cmd>tabnew<cr>", desc = "New tab" }
       maps.n["<Leader>bD"] = {
