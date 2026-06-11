@@ -65,6 +65,81 @@ function M.remove_keymap(mode, key)
   end
 end
 
+function M.is_claude_window(win)
+  if not (win and vim.api.nvim_win_is_valid(win)) then return false end
+  local buf = vim.api.nvim_win_get_buf(win)
+  return vim.bo[buf].filetype == "claude"
+end
+
+function M.is_neotree_window(win)
+  if not (win and vim.api.nvim_win_is_valid(win)) then return false end
+  local buf = vim.api.nvim_win_get_buf(win)
+  return vim.bo[buf].filetype == "neo-tree"
+end
+
+function M.is_editable_window(win)
+  if not (win and vim.api.nvim_win_is_valid(win)) then return false end
+  local buf = vim.api.nvim_win_get_buf(win)
+  if not vim.bo[buf].buflisted then return false end
+  if vim.bo[buf].buftype ~= "" then return false end
+  local filetype = vim.bo[buf].filetype
+  if filetype == "" or filetype == "neo-tree" or filetype == "claude" then return false end
+  return vim.bo[buf].modifiable
+end
+
+function M.find_left_target_window(from_win)
+  if not (from_win and vim.api.nvim_win_is_valid(from_win)) then return nil end
+  local from_pos = vim.api.nvim_win_get_position(from_win)
+  local left_editable, left_neotree
+  local editable_col, neotree_col
+
+  for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+    if win ~= from_win and vim.api.nvim_win_is_valid(win) then
+      local pos = vim.api.nvim_win_get_position(win)
+      if pos[2] < from_pos[2] then
+        if M.is_editable_window(win) and (not editable_col or pos[2] > editable_col) then
+          left_editable = win
+          editable_col = pos[2]
+        elseif M.is_neotree_window(win) and (not neotree_col or pos[2] > neotree_col) then
+          left_neotree = win
+          neotree_col = pos[2]
+        end
+      end
+    end
+  end
+
+  return left_editable or left_neotree
+end
+
+function M.find_right_claude_window(from_win)
+  if not (from_win and vim.api.nvim_win_is_valid(from_win)) then return nil end
+  local from_pos = vim.api.nvim_win_get_position(from_win)
+  local right_claude, claude_col
+
+  for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+    if win ~= from_win and vim.api.nvim_win_is_valid(win) and M.is_claude_window(win) then
+      local pos = vim.api.nvim_win_get_position(win)
+      if pos[2] > from_pos[2] and (not claude_col or pos[2] < claude_col) then
+        right_claude = win
+        claude_col = pos[2]
+      end
+    end
+  end
+
+  return right_claude
+end
+
+function M.focus_right_claude_or_window()
+  local target = M.find_right_claude_window(vim.api.nvim_get_current_win())
+  if target then
+    vim.api.nvim_set_current_win(target)
+    vim.cmd "startinsert"
+    return
+  end
+
+  vim.cmd "wincmd l"
+end
+
 function M.toggle_lazy_docker()
   return function()
     require("astrocore").toggle_term_cmd {
@@ -87,6 +162,73 @@ function M.toggle_lazy_docker()
         vim.cmd [[stopinsert]]
       end,
     }
+  end
+end
+
+function M.toggle_claude_cli()
+  local state = {
+    buf = nil,
+    win = nil,
+    job = nil,
+  }
+
+  local function restore_terminal_navigation()
+    vim.keymap.set("t", "<C-H>", "<cmd>wincmd h<cr>", { silent = true, noremap = true })
+    vim.keymap.set("t", "<C-J>", "<cmd>wincmd j<cr>", { silent = true, noremap = true })
+    vim.keymap.set("t", "<C-K>", "<cmd>wincmd k<cr>", { silent = true, noremap = true })
+    vim.keymap.set("t", "<C-L>", "<cmd>wincmd l<cr>", { silent = true, noremap = true })
+  end
+
+  local function clear_state()
+    state.buf = nil
+    state.win = nil
+    state.job = nil
+    restore_terminal_navigation()
+  end
+
+  return function()
+    if state.win and vim.api.nvim_win_is_valid(state.win) then
+      vim.api.nvim_win_close(state.win, true)
+      clear_state()
+      return
+    end
+
+    M.remove_keymap("t", "<C-H>")
+    M.remove_keymap("t", "<C-J>")
+    M.remove_keymap("t", "<C-K>")
+    M.remove_keymap("t", "<C-L>")
+
+    vim.cmd "botright vsplit"
+    state.win = vim.api.nvim_get_current_win()
+    vim.api.nvim_win_set_width(state.win, math.min(80, math.max(60, vim.o.columns - 20)))
+
+    state.buf = vim.api.nvim_create_buf(false, true)
+    vim.api.nvim_win_set_buf(state.win, state.buf)
+    vim.bo[state.buf].bufhidden = "wipe"
+    vim.bo[state.buf].filetype = "claude"
+
+    state.job = vim.fn.termopen("claude", {
+      on_exit = function()
+        vim.schedule(function()
+          if state.win and vim.api.nvim_win_is_valid(state.win) then vim.api.nvim_win_close(state.win, true) end
+          clear_state()
+        end)
+      end,
+    })
+
+    vim.api.nvim_buf_set_keymap(state.buf, "t", "<Esc><Esc>", "<C-\\><C-n><Cmd>close<CR>", { noremap = true, silent = true })
+    vim.keymap.set("t", "<C-H>", function()
+      local target = M.find_left_target_window(state.win)
+      if not target then return end
+      vim.api.nvim_set_current_win(target)
+    end, { buffer = state.buf, silent = true, noremap = true, desc = "Focus editable window or Neo-tree" })
+    vim.api.nvim_create_autocmd("BufWinLeave", {
+      buffer = state.buf,
+      once = true,
+      callback = clear_state,
+    })
+
+    vim.cmd "startinsert"
   end
 end
 

@@ -42,12 +42,17 @@ return {
       maps.i["<C-S>"] = { "<esc>:w<cr>a", desc = "Save file", silent = true }
       maps.x["<C-S>"] = { "<esc>:w<cr>a", desc = "Save file", silent = true }
       maps.n["<C-S>"] = { "<Cmd>w<cr>", desc = "Save file", silent = true }
+      maps.n["<C-l>"] = { function() require("utils").focus_right_claude_or_window() end, desc = "Focus right Claude or window" }
 
       maps.n["<Leader>wo"] = { "<C-w>o", desc = "Close other screen" }
       maps.v["p"] = { "pgvy", desc = "Paste" }
 
       if vim.fn.executable "btm" == 1 then
         maps.n["<Leader>tT"] = { function() utils.toggle_term_cmd "btm" end, desc = "ToggleTerm btm" }
+      end
+      if vim.fn.executable "claude" == 1 then
+        maps.n["<Leader>cc"] = { require("utils").toggle_claude_cli(), desc = "Toggle Claude CLI" }
+        maps.n["<Leader>tc"] = { require("utils").toggle_claude_cli(), desc = "Toggle Claude CLI" }
       end
 
       maps.n["n"] = { "nzz" }
