@@ -218,6 +218,175 @@ local function show_symbol_references()
   end)
 end
 
+local function get_code_action_title(action)
+  if type(action.title) == "string" and action.title ~= "" then return action.title end
+  return "<unnamed code action>"
+end
+
+local function is_quick_fix_like_action(action)
+  local kind = type(action.kind) == "string" and action.kind or ""
+  if kind == "" then return true end
+  return kind == "quickfix"
+    or vim.startswith(kind, "quickfix.")
+    or vim.startswith(kind, "source.addMissingImports")
+    or vim.startswith(kind, "source.fixAll")
+end
+
+local quick_fix_kinds = {
+  "quickfix",
+  "source.addMissingImports",
+  "source.addMissingImports.ts",
+  "source.fixAll",
+  "source.fixAll.ts",
+}
+
+local function get_lsp_diagnostics_at_cursor(bufnr, lnum)
+  local diagnostics = vim.diagnostic.get(bufnr, { lnum = lnum })
+  return vim.tbl_map(function(diag) return (diag.user_data and diag.user_data.lsp) or diag end, diagnostics)
+end
+
+local function collect_code_actions(bufnr, context, callback)
+  local params = vim.lsp.util.make_range_params(0, "utf-16")
+  params.context = context or {}
+
+  vim.lsp.buf_request_all(bufnr, "textDocument/codeAction", params, function(results)
+    local actions = {}
+
+    for client_id, response in pairs(results or {}) do
+      if response and not response.err and response.result then
+        local client = vim.lsp.get_client_by_id(client_id)
+        for _, action in ipairs(response.result) do
+          actions[#actions + 1] = {
+            action = action,
+            client = client,
+            bufnr = bufnr,
+          }
+        end
+      end
+    end
+
+    callback(actions, results)
+  end)
+end
+
+local function apply_code_action(action, client)
+  if not action then return end
+
+  if action.edit then
+    vim.lsp.util.apply_workspace_edit(action.edit, client and client.offset_encoding or "utf-16")
+  end
+
+  local command = action.command
+  if type(command) == "table" then
+    local command_client = client
+    if command_client then
+      command_client:exec_cmd(command, { bufnr = vim.api.nvim_get_current_buf() })
+    else
+      vim.lsp.buf.execute_command(command)
+    end
+  elseif type(command) == "string" and command ~= "" then
+    vim.lsp.buf.execute_command {
+      command = command,
+      arguments = action.arguments,
+    }
+  end
+end
+
+local function resolve_and_apply_code_action(action, client, bufnr)
+  if not client or not client:supports_method "codeAction/resolve" then
+    return apply_code_action(action, client)
+  end
+
+  if action.edit or action.command then return apply_code_action(action, client) end
+
+  client:request("codeAction/resolve", action, function(err, resolved)
+    if err then
+      return vim.notify(("Code action resolve failed: %s"):format(err.message), vim.log.levels.WARN)
+    end
+
+    apply_code_action(resolved or action, client)
+  end, bufnr)
+end
+
+local function select_code_action_with_picker(actions)
+  local ok_pickers, pickers = pcall(require, "telescope.pickers")
+  local ok_finders, finders = pcall(require, "telescope.finders")
+  local ok_config, telescope_config = pcall(require, "telescope.config")
+  local ok_actions, telescope_actions = pcall(require, "telescope.actions")
+  local ok_state, action_state = pcall(require, "telescope.actions.state")
+  local ok_themes, themes = pcall(require, "telescope.themes")
+
+  if not (ok_pickers and ok_finders and ok_config and ok_actions and ok_state and ok_themes) then
+    return vim.ui.select(actions, {
+      prompt = "Quick fix",
+      format_item = function(item) return get_code_action_title(item.action) end,
+    }, function(choice)
+      if choice then resolve_and_apply_code_action(choice.action, choice.client, choice.bufnr) end
+    end)
+  end
+
+  pickers
+    .new(themes.get_dropdown {
+      prompt_title = "Quick fix",
+      previewer = false,
+      results_title = false,
+      layout_config = {
+        width = 0.6,
+        height = 0.4,
+      },
+    }, {
+      finder = finders.new_table {
+        results = actions,
+        entry_maker = function(item)
+          local title = get_code_action_title(item.action)
+          return {
+            value = item,
+            display = title,
+            ordinal = title,
+          }
+        end,
+      },
+      sorter = telescope_config.values.generic_sorter {},
+      attach_mappings = function(prompt_bufnr)
+        telescope_actions.select_default:replace(function()
+          local selection = action_state.get_selected_entry()
+          telescope_actions.close(prompt_bufnr)
+          if selection and selection.value then
+            resolve_and_apply_code_action(selection.value.action, selection.value.client, selection.value.bufnr)
+          end
+        end)
+
+        return true
+      end,
+    })
+    :find()
+end
+
+local function quick_fix()
+  local bufnr = vim.api.nvim_get_current_buf()
+  local cursor = vim.api.nvim_win_get_cursor(0)
+  local context = {
+    only = quick_fix_kinds,
+    diagnostics = get_lsp_diagnostics_at_cursor(bufnr, cursor[1] - 1),
+  }
+
+  collect_code_actions(bufnr, context, function(all_actions)
+    local actions = vim.tbl_filter(function(item) return is_quick_fix_like_action(item.action) end, all_actions)
+
+    if vim.tbl_isempty(actions) then
+      return vim.notify("No quick fixes available", vim.log.levels.INFO)
+    end
+
+    table.sort(actions, function(a, b)
+      return get_code_action_title(a.action):lower() < get_code_action_title(b.action):lower()
+    end)
+
+    if #actions == 1 then return resolve_and_apply_code_action(actions[1].action, actions[1].client, bufnr) end
+
+    select_code_action_with_picker(actions)
+  end)
+end
+
 local function goto_source_definition_or_implementation()
   local bufnr = vim.api.nvim_get_current_buf()
   local filetype = vim.bo[bufnr].filetype
@@ -293,8 +462,13 @@ return {
         --    require("telescope.builtin").lsp_references
         -- },
         ["gd"] = {
-           vim.lsp.buf.definition,
+           function() require("telescope.builtin").lsp_definitions() end,
            cond = "textDocument/definition",
+        },
+        ["<Leader>m"] = {
+           quick_fix,
+           desc = "Quick fix",
+           cond = "textDocument/codeAction",
         },
         ["gI"] = {
            goto_source_definition_or_implementation,
