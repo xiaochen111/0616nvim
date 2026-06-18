@@ -1,6 +1,31 @@
 local utils = require "astrocore"
 local set_mappings = utils.set_mappings
 
+local function ts_project_root(fname)
+  local root_pattern = require("lspconfig").util.root_pattern(
+    "tsconfig.json",
+    "tsconfig.base.json",
+    "jsconfig.json",
+    "package.json"
+  )
+  return root_pattern(fname) or vim.fs.dirname(fname)
+end
+
+local function eslint_project_root(fname)
+  local root_pattern = require("lspconfig").util.root_pattern(
+    "eslint.config.js",
+    "eslint.config.cjs",
+    "eslint.config.mjs",
+    "eslint.config.ts",
+    ".eslintrc",
+    ".eslintrc.js",
+    ".eslintrc.cjs",
+    ".eslintrc.json",
+    "package.json"
+  )
+  return root_pattern(fname) or ts_project_root(fname)
+end
+
 local function decode_json(filename)
   -- Open the file in read mode
   local file = io.open(filename, "r")
@@ -84,7 +109,14 @@ return {
         },
       },
       config = {
+        eslint = {
+          root_dir = eslint_project_root,
+          settings = {
+            workingDirectory = { mode = "location" },
+          },
+        },
         vtsls = {
+          root_dir = ts_project_root,
           on_attach = function()
             set_mappings({
               n = {
@@ -144,7 +176,7 @@ return {
     },
     opts = function(_, opts)
       opts.ensure_installed = require("astrocore").list_insert_unique(opts.ensure_installed or {}, { "eslint", "vtsls" })
-      opts.automatic_installation = true
+      opts.automatic_installation = false
       opts.handlers = opts.handlers or {}
       -- Prefer vtsls for TS/JS and prevent Mason from auto-setting up ts_ls
       opts.handlers.ts_ls = function() end

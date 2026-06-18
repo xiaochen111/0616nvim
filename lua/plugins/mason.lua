@@ -15,6 +15,7 @@ return {
     dependencies = { "williamboman/mason.nvim" },
     init = function(plugin) require("astrocore").on_load("mason.nvim", plugin.name) end,
     opts = {
+      run_on_start = false,
       ensure_installed = {
         { "pylance", version = "2024.3.2" }, -- last known working version
       },
@@ -22,7 +23,6 @@ return {
     config = function(_, opts)
       local mason_tool_installer = require "mason-tool-installer"
       mason_tool_installer.setup(opts)
-      mason_tool_installer.run_on_start()
     end,
   },
   { "williamboman/mason-lspconfig.nvim", opts = {} },

@@ -122,7 +122,6 @@ return {
         },
         -- add a component to display LSP clients, disable showing LSP progress, and use the right separator
         status.component.lsp {
-          lsp_progress = false,
           padding = { right = 1 },
           surround = { separator = "right" },
           lsp_client_names = {

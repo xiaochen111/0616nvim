@@ -8,6 +8,17 @@ local ts_source_definition_filetypes = {
   "typescriptreact",
 }
 
+local ts_reference_filetypes = {
+  javascript = true,
+  javascriptreact = true,
+  typescript = true,
+  typescriptreact = true,
+}
+
+local ts_client_attach_time = {}
+local ts_root_reference_ready = {}
+local ts_warmup_threshold_ms = 15000
+
 local function get_workspace_root(bufnr)
   for _, client in ipairs(vim.lsp.get_clients { bufnr = bufnr }) do
     local root_dir = client.config and client.config.root_dir
@@ -17,6 +28,47 @@ local function get_workspace_root(bufnr)
   local current_file = vim.api.nvim_buf_get_name(bufnr)
   return vim.fs.root(current_file, { "tsconfig.json", "jsconfig.json", "package.json", ".git" })
     or vim.fn.getcwd()
+end
+
+local function is_typescript_client(client)
+  return client and (client.name == "vtsls" or client.name == "ts_ls" or client.name == "tsserver")
+end
+
+local function get_typescript_client(bufnr)
+  for _, client in ipairs(vim.lsp.get_clients { bufnr = bufnr }) do
+    if is_typescript_client(client) then return client end
+  end
+end
+
+local function mark_ts_client_attach(client)
+  if not is_typescript_client(client) or ts_client_attach_time[client.id] then return end
+  ts_client_attach_time[client.id] = vim.uv.now()
+end
+
+local function get_ts_root_key(bufnr, client)
+  client = client or get_typescript_client(bufnr)
+  if not client then return nil end
+  return (client.config and client.config.root_dir) or get_workspace_root(bufnr)
+end
+
+local function mark_ts_root_ready(bufnr, client)
+  local root_key = get_ts_root_key(bufnr, client)
+  if root_key and root_key ~= "" then ts_root_reference_ready[root_key] = true end
+end
+
+local function is_ts_root_ready(bufnr, client)
+  local root_key = get_ts_root_key(bufnr, client)
+  return root_key and ts_root_reference_ready[root_key] == true or false
+end
+
+local function is_ts_client_in_warmup(bufnr)
+  local client = get_typescript_client(bufnr)
+  if not client then return false end
+  mark_ts_client_attach(client)
+  if is_ts_root_ready(bufnr, client) then return false end
+  local attached_at = ts_client_attach_time[client.id]
+  if not attached_at then return false end
+  return (vim.uv.now() - attached_at) < ts_warmup_threshold_ms
 end
 
 local function open_items_in_quickfix(title, items)
@@ -150,10 +202,40 @@ end
 
 local function collect_text_search_items(root, terms)
   local items = {}
+  local globs = {
+    "*.ts",
+    "*.tsx",
+    "*.js",
+    "*.jsx",
+  }
 
   for _, term in ipairs(terms) do
     if term and term ~= "" then
-      local output = vim.fn.systemlist({ "rg", "--vimgrep", "--smart-case", term, root })
+      local escaped = term:gsub("([%^%$%(%)%%%.%[%]%*%+%-%?])", "\\%1")
+      local pattern = ([[\b%s\b]]):format(escaped)
+      local command = {
+        "rg",
+        "--vimgrep",
+        "--smart-case",
+        "--glob",
+        "!node_modules/**",
+        "--glob",
+        "!.next/**",
+        "--glob",
+        "!dist/**",
+        "--glob",
+        "!build/**",
+      }
+
+      for _, glob in ipairs(globs) do
+        command[#command + 1] = "--glob"
+        command[#command + 1] = glob
+      end
+
+      command[#command + 1] = pattern
+      command[#command + 1] = root
+
+      local output = vim.fn.systemlist(command)
       if vim.v.shell_error ~= 0 and vim.v.shell_error ~= 1 then
         vim.notify(("rg search failed for %s"):format(term), vim.log.levels.WARN)
       else
@@ -175,47 +257,163 @@ local function collect_text_search_items(root, terms)
   return items
 end
 
+local function collect_reference_items(results)
+  local items = {}
+
+  for client_id, response in pairs(results or {}) do
+    if response and not response.err and response.result then
+      local client = vim.lsp.get_client_by_id(client_id)
+      local position_encoding = client and client.offset_encoding or "utf-16"
+      vim.list_extend(items, vim.lsp.util.locations_to_items(response.result, position_encoding))
+    end
+  end
+
+  return items
+end
+
+local function get_typescript_progress()
+  local ok, astrolsp = pcall(require, "astrolsp")
+  if not ok or type(astrolsp.lsp_progress) ~= "table" then return nil end
+
+  for id, progress in pairs(astrolsp.lsp_progress) do
+    local client_id = tonumber(type(id) == "string" and id:match "^(%d+)%.")
+    local client = client_id and vim.lsp.get_client_by_id(client_id) or nil
+    if is_typescript_client(client) then
+      return {
+        title = progress.title,
+        message = progress.message,
+        percentage = progress.percentage,
+      }
+    end
+  end
+
+  return nil
+end
+
+local function has_cross_file_items(items, current_file)
+  local normalized_current = vim.fs.normalize(current_file or "")
+  if normalized_current == "" then return false end
+
+  for _, item in ipairs(items or {}) do
+    local filename = item.filename and vim.fs.normalize(item.filename) or ""
+    if filename ~= "" and filename ~= normalized_current then return true end
+  end
+
+  return false
+end
+
+local function has_typescript_reference_client(bufnr)
+  for _, client in ipairs(vim.lsp.get_clients { bufnr = bufnr }) do
+    if is_typescript_client(client) and client.supports_method "textDocument/references" then
+      return true
+    end
+  end
+
+  return false
+end
+
+local function request_reference_results(bufnr, callback)
+  local win = vim.api.nvim_get_current_win()
+  vim.lsp.buf_request_all(bufnr, "textDocument/references", function(client)
+    local params = vim.lsp.util.make_position_params(win, client.offset_encoding)
+    params.context = { includeDeclaration = false }
+    return params
+  end, callback)
+end
+
+local function resolve_reference_items(bufnr, callback, opts)
+  opts = opts or {}
+
+  request_reference_results(bufnr, function(results)
+    local items = collect_reference_items(results)
+    if not vim.tbl_isempty(items) then return callback(items) end
+
+    if opts.remaining_retries and opts.remaining_retries > 0 and has_typescript_reference_client(bufnr) then
+      return vim.defer_fn(function()
+        resolve_reference_items(bufnr, callback, {
+          remaining_retries = opts.remaining_retries - 1,
+          retry_delay = opts.retry_delay,
+        })
+      end, opts.retry_delay or 400)
+    end
+
+    callback(items)
+  end)
+end
+
 local function show_symbol_references()
   local bufnr = vim.api.nvim_get_current_buf()
   local symbol = get_current_symbol()
   if not symbol then return end
   local root = get_workspace_root(bufnr)
-  local items = {}
-  local params = vim.lsp.util.make_position_params()
-  params.context = { includeDeclaration = false }
+  local is_ts_reference_file = ts_reference_filetypes[vim.bo[bufnr].filetype] == true
+  local current_file = vim.api.nvim_buf_get_name(bufnr)
+  resolve_reference_items(bufnr, function(items)
+    local used_text_fallback = false
+    local picker_title = ("References: %s"):format(symbol)
+    local only_current_file_references = false
+    local ts_progress = is_ts_reference_file and get_typescript_progress() or nil
 
-  vim.lsp.buf_request_all(bufnr, "textDocument/references", params, function(results)
-    local locations = {}
-
-    for _, response in pairs(results or {}) do
-      if response and not response.err and response.result then
-        if response.result.uri or response.result.targetUri then
-          locations[#locations + 1] = response.result
-        else
-          vim.list_extend(locations, response.result)
-        end
+    if vim.tbl_isempty(items) then
+      local search_terms = { symbol }
+      if buffer_has_default_export_of_symbol(bufnr, symbol) then
+        local module_stem = get_current_module_stem(bufnr)
+        if module_stem and module_stem ~= symbol then search_terms[#search_terms + 1] = module_stem end
       end
+
+      items = collect_text_search_items(root, search_terms)
+      used_text_fallback = not vim.tbl_isempty(items)
     end
 
-    if not vim.tbl_isempty(locations) then
-      items = vim.lsp.util.locations_to_items(locations, bufnr)
-    end
-
-    local search_terms = { symbol }
-    if buffer_has_default_export_of_symbol(bufnr, symbol) then
-      local module_stem = get_current_module_stem(bufnr)
-      if module_stem and module_stem ~= symbol then search_terms[#search_terms + 1] = module_stem end
-    end
-
-    vim.list_extend(items, collect_text_search_items(root, search_terms))
     items = dedupe_items(items)
 
     if vim.tbl_isempty(items) then
       return vim.notify(("No references for %s"):format(symbol), vim.log.levels.INFO)
     end
 
-    open_items_in_picker(("References: %s"):format(symbol), items)
-  end)
+    if is_ts_reference_file and not used_text_fallback and not has_cross_file_items(items, current_file) then
+      only_current_file_references = true
+    elseif is_ts_reference_file and not used_text_fallback then
+      mark_ts_root_ready(bufnr)
+    end
+
+    if used_text_fallback and ts_progress then
+      picker_title = ("TS LSP 索引中，当前为文本匹配: %s"):format(symbol)
+      vim.notify(
+        ("TS LSP 正在索引%s，当前为 %s 的文本匹配结果"):format(
+          ts_progress.message and ("（" .. ts_progress.message .. "）") or "",
+          symbol
+        ),
+        vim.log.levels.WARN
+      )
+    elseif used_text_fallback and is_ts_reference_file and is_ts_client_in_warmup(bufnr) then
+      picker_title = ("TS LSP 预热中，当前为文本匹配: %s"):format(symbol)
+      vim.notify(
+        ("TS LSP 尚未上报 progress，当前可能仍在预热，先展示 %s 的文本匹配结果"):format(symbol),
+        vim.log.levels.WARN
+      )
+    elseif only_current_file_references and ts_progress then
+      picker_title = ("TS LSP 索引中，当前仅文件内引用: %s"):format(symbol)
+      vim.notify(
+        ("TS LSP 正在索引%s，%s 当前仅显示文件内引用"):format(
+          ts_progress.message and ("（" .. ts_progress.message .. "）") or "",
+          symbol
+        ),
+        vim.log.levels.WARN
+      )
+    elseif only_current_file_references and is_ts_reference_file and is_ts_client_in_warmup(bufnr) then
+      picker_title = ("TS LSP 预热中，当前仅文件内引用: %s"):format(symbol)
+      vim.notify(
+        ("TS LSP 尚未上报 progress，当前可能仍在预热，%s 暂时只显示文件内引用"):format(symbol),
+        vim.log.levels.WARN
+      )
+    end
+
+    open_items_in_picker(picker_title, items)
+  end, {
+    remaining_retries = 2,
+    retry_delay = 300,
+  })
 end
 
 local function get_code_action_title(action)
@@ -441,6 +639,23 @@ return {
       -- Configuration table of features provided by AstroLSP
       autoformat = false, -- enable or disable auto formatting on start
       inlay_hints = false, -- nvim >= 0.10 这个如果开启 方法里的变量会自动给出类型提示 还是关闭了  有点太花了😅
+    },
+    autocmds = {
+      ts_lsp_attach_state = {
+        {
+          event = "LspAttach",
+          desc = "Track TypeScript LSP attach time",
+          callback = function(args)
+            local client = vim.lsp.get_client_by_id(args.data.client_id)
+            if is_typescript_client(client) then mark_ts_client_attach(client) end
+          end,
+        },
+        {
+          event = "LspDetach",
+          desc = "Clear TypeScript LSP attach time",
+          callback = function(args) ts_client_attach_time[args.data.client_id] = nil end,
+        },
+      },
     },
     -- Configuration options for controlling formatting with language servers
     formatting = {
