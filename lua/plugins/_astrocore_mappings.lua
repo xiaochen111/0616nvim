@@ -181,6 +181,10 @@ return {
       maps.n["gj"] = {function() require('gitsigns').next_hunk() end}
       maps.n["gk"] = {function() require('gitsigns').prev_hunk() end}
       maps.n["gh"] = {function() vim.lsp.buf.hover() end}
+      maps.n["<Leader>gh"] = {
+        function() require("utils").open_git_file_history() end,
+        desc = "Git file history",
+      }
       maps.n["gra"] = false
       maps.x["gra"] = false
       maps.n["grn"] = false
