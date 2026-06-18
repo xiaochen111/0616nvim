@@ -64,6 +64,16 @@ return {
             "build/",
             "%.DS_Store",
           },
+          mappings = {
+            i = {
+              ["<C-j>"] = actions.preview_scrolling_down,
+              ["<C-k>"] = actions.preview_scrolling_up,
+            },
+            n = {
+              ["<C-j>"] = actions.preview_scrolling_down,
+              ["<C-k>"] = actions.preview_scrolling_up,
+            },
+          },
         },
         pickers = {
           find_files = {

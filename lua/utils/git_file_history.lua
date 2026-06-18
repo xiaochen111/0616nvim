@@ -9,18 +9,14 @@ local FOLLOW_LOG_FORMAT = ("--format=%s%%H%s%%P%s%%ct%s%%cs%s%%an%s%%s"):format(
   FIELD_SEP,
   FIELD_SEP
 )
-local COMMIT_META_FORMAT = ("--format=%%H%s%%ct%s%%cs%s%%an%s%%s"):format(
-  FIELD_SEP,
-  FIELD_SEP,
-  FIELD_SEP,
-  FIELD_SEP
-)
 
 local pickers = require "telescope.pickers"
 local finders = require "telescope.finders"
 local conf = require("telescope.config").values
 local actions = require "telescope.actions"
 local action_state = require "telescope.actions.state"
+local previewers = require "telescope.previewers"
+local putils = require "telescope.previewers.utils"
 
 local function run_git(args)
   local cmd = { "git" }
@@ -71,20 +67,6 @@ local function parse_log_entries(lines)
   return entries
 end
 
-local function get_commit_metadata(git_root, sha)
-  local output = run_git({ "-C", git_root, "show", "-s", COMMIT_META_FORMAT, sha })
-  if not output or not output[1] then return nil, "Failed to read git history" end
-
-  local parts = vim.split(output[1], FIELD_SEP, { plain = true })
-  return {
-    sha = parts[1] or sha,
-    timestamp = tonumber(parts[2]) or 0,
-    date = parts[3] or "",
-    author = parts[4] or "",
-    subject = parts[5] or "",
-  }
-end
-
 local function get_current_file_context()
   local abs_path = vim.api.nvim_buf_get_name(0)
   if abs_path == "" or vim.bo.buftype ~= "" or vim.fn.filereadable(abs_path) ~= 1 then
@@ -93,6 +75,7 @@ local function get_current_file_context()
 
   abs_path = vim.fs.normalize(abs_path)
   local file_dir = vim.fs.dirname(abs_path)
+
   local git_root_output = run_git({ "-C", file_dir, "rev-parse", "--show-toplevel" })
   if not git_root_output or not git_root_output[1] or git_root_output[1] == "" then
     return nil, "Not in a git repository"
@@ -101,9 +84,6 @@ local function get_current_file_context()
   local git_root = vim.fs.normalize(git_root_output[1])
   local rel_path = vim.fs.relpath(git_root, abs_path)
   if not rel_path or rel_path == "" then return nil, "Not in a git repository" end
-
-  local tracked = run_git({ "-C", git_root, "ls-files", "--error-unmatch", "--", rel_path })
-  if not tracked then return nil, "File is not tracked by git" end
 
   return {
     abs_path = abs_path,
@@ -119,6 +99,7 @@ local function get_follow_history(context)
     context.git_root,
     "log",
     "--follow",
+    "--full-history",
     "--name-status",
     FOLLOW_LOG_FORMAT,
     "--",
@@ -129,7 +110,6 @@ local function get_follow_history(context)
   local entries = parse_log_entries(log_output)
   if #entries == 0 then return nil, "No git history found for file" end
 
-  local segments = { { path = context.rel_path, tip = "HEAD" } }
   local path_at_commit = context.rel_path
   local history_entries = {}
   local order = 0
@@ -140,65 +120,32 @@ local function get_follow_history(context)
     if #entry.parents <= 1 then
       order = order + 1
       table.insert(history_entries, make_entry(entry, entry_path, order))
+    else
+      local has_patch = false
+      for _, change in ipairs(entry.changes) do
+        local parts = vim.split(change, "\t", { plain = true })
+        if #parts >= 2 and parts[#parts] == entry_path then
+          has_patch = true
+          break
+        end
+      end
+      if has_patch then
+        order = order + 1
+        table.insert(history_entries, make_entry(entry, entry_path, order))
+      end
     end
 
     for _, change in ipairs(entry.changes) do
       local parts = vim.split(change, "\t", { plain = true })
       if parts[1] and parts[1]:match "^R" and parts[3] == entry_path then
         local parent = entry.parents[1]
-        if parent and parent ~= "" then
-          path_at_commit = parts[2]
-          table.insert(segments, { path = path_at_commit, tip = parent })
-        end
+        if parent and parent ~= "" then path_at_commit = parts[2] end
         break
       end
     end
   end
 
-  return history_entries, segments, order
-end
-
-local function merge_has_file_patch(git_root, sha, path)
-  local output = run_git({ "-C", git_root, "diff-tree", "-c", "--name-status", sha, "--", path })
-  if not output then return nil, "Failed to read git history" end
-
-  for _, line in ipairs(output) do
-    if line:find("\t", 1, true) then
-      local parts = vim.split(line, "\t", { plain = true })
-      if parts[#parts] == path then return true end
-    end
-  end
-
-  return false
-end
-
-local function get_merge_entries(context, segments, order)
-  local merge_entries = {}
-  local seen = {}
-
-  for _, segment in ipairs(segments) do
-    local lines = run_git({ "-C", context.git_root, "rev-list", "--full-history", "--parents", segment.tip, "--", segment.path })
-    if not lines then return nil, "Failed to read git history" end
-
-    for _, line in ipairs(lines) do
-      local parts = vim.split(line, " ", { trimempty = true })
-      local sha = parts[1]
-      if sha and #parts > 2 and not seen[sha] then
-        seen[sha] = true
-        local has_patch, err = merge_has_file_patch(context.git_root, sha, segment.path)
-        if err then return nil, err end
-        if has_patch then
-          local meta
-          meta, err = get_commit_metadata(context.git_root, sha)
-          if err then return nil, err end
-          order = order + 1
-          table.insert(merge_entries, make_entry(meta, segment.path, order))
-        end
-      end
-    end
-  end
-
-  return merge_entries
+  return history_entries
 end
 
 local function sort_entries(entries)
@@ -250,7 +197,51 @@ local function open_diff_buffer(context, entry)
   vim.bo[buf].filetype = "diff"
 end
 
+local function make_diff_previewer(context)
+  return previewers.new_buffer_previewer {
+    title = "Commit Diff",
+    get_buffer_by_name = function(_, entry) return entry.value.sha end,
+    define_preview = function(self, entry, status)
+      local diff_lines = get_commit_file_diff(context, entry.value.sha, entry.value.path)
+      if not diff_lines then diff_lines = { "No diff available" } end
+
+      vim.api.nvim_buf_set_lines(self.state.bufnr, 0, -1, false, diff_lines)
+      putils.highlighter(self.state.bufnr, "diff")
+    end,
+  }
+end
+
 local function open_picker(context, entries)
+  local function open_full_preview(entry)
+    local diff_lines = get_commit_file_diff(context, entry.sha, entry.path)
+    if not diff_lines then diff_lines = { "No diff available" } end
+
+    local buf = vim.api.nvim_create_buf(false, true)
+    vim.api.nvim_buf_set_lines(buf, 0, -1, false, diff_lines)
+    vim.bo[buf].filetype = "diff"
+    vim.bo[buf].modifiable = false
+    vim.bo[buf].bufhidden = "wipe"
+
+    local width = vim.o.columns
+    local height = vim.o.lines
+    local win = vim.api.nvim_open_win(buf, true, {
+      relative = "editor",
+      width = width - 4,
+      height = height - 4,
+      row = 2,
+      col = 2,
+      style = "minimal",
+      border = "rounded",
+      title = (" Diff: %s - %s "):format(entry.short_sha, entry.subject),
+      title_pos = "center",
+    })
+
+    vim.keymap.set("n", "<Esc>", function()
+      if vim.api.nvim_win_is_valid(win) then vim.api.nvim_win_close(win, true) end
+      vim.schedule(function() open_picker(context, entries) end)
+    end, { buffer = buf, nowait = true })
+  end
+
   pickers
     .new({}, {
       prompt_title = ("Git File History: %s"):format(context.file_name),
@@ -265,13 +256,16 @@ local function open_picker(context, entries)
         end,
       },
       sorter = conf.generic_sorter({}),
-      previewer = conf.grep_previewer({}),
-      attach_mappings = function(prompt_bufnr)
+      previewer = make_diff_previewer(context),
+      attach_mappings = function(prompt_bufnr, map)
         actions.select_default:replace(function()
-          actions.close(prompt_bufnr)
           local selection = action_state.get_selected_entry()
-          if selection then open_diff_buffer(context, selection.value) end
+          if selection then
+            actions.close(prompt_bufnr)
+            vim.schedule(function() open_full_preview(selection.value) end)
+          end
         end)
+
         return true
       end,
     })
@@ -279,13 +273,8 @@ local function open_picker(context, entries)
 end
 
 local function get_file_history_entries(context)
-  local entries, segments, order_or_err = get_follow_history(context)
-  if not entries then return nil, segments end
-
-  local merge_entries, err = get_merge_entries(context, segments, order_or_err)
-  if not merge_entries then return nil, err end
-
-  vim.list_extend(entries, merge_entries)
+  local entries = get_follow_history(context)
+  if not entries then return nil, "Failed to read git history" end
 
   if #entries == 0 then return nil, "No git history found for file" end
 
