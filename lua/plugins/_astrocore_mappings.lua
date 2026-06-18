@@ -157,6 +157,21 @@ return {
       end}
 
       maps.n["<Leader>n"] = {"*"}
+      maps.n["<Leader>fg"] = {
+        function()
+          local git_root = vim.fn.systemlist("git rev-parse --show-toplevel")[1]
+          if not git_root or git_root == "" then
+            vim.notify("Not in a git repository", vim.log.levels.WARN)
+            return
+          end
+
+          require("telescope.builtin").find_files {
+            cwd = git_root,
+            find_command = { "git", "ls-files", "--modified", "--others", "--exclude-standard" },
+          }
+        end,
+        desc = "Find Git changed files",
+      }
 
       maps.n["<Leader>h"] = { "^", desc = "Go to start of line" }
       maps.n["<Leader>l"] = { "$", desc = "Go to end of line" }
