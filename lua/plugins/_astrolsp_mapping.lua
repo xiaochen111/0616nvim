@@ -70,7 +70,7 @@ return {
       }
 
       -- 格式化
-      maps.n["<Leader>sf"] = {
+      maps.n["<Leader>ss"] = {
         function() vim.lsp.buf.format(require("astrolsp").format_opts) end,
         desc = "Format buffer",
         cond = function(client)
@@ -80,7 +80,7 @@ return {
             and not vim.tbl_contains(disabled or {}, client.name)
         end,
       }
-      maps.v["<Leader>sf"] = {
+      maps.v["<Leader>ss"] = {
         function() vim.lsp.buf.format(require("astrolsp").format_opts) end,
         desc = "Format buffer",
         cond = function(client)
