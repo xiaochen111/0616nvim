@@ -80,6 +80,14 @@ local function open_items_in_quickfix(title, items)
   vim.cmd "copen"
 end
 
+local function jump_to_item(item)
+  local filename = item.filename or item.bufnr and vim.api.nvim_buf_get_name(item.bufnr) or ""
+  if filename == "" then return end
+
+  vim.cmd(("edit %s"):format(vim.fn.fnameescape(filename)))
+  vim.api.nvim_win_set_cursor(0, { item.lnum, math.max((item.col or 1) - 1, 0) })
+end
+
 local function open_items_in_picker(title, items)
   if vim.tbl_isempty(items) then return end
 
@@ -138,9 +146,7 @@ local function open_items_in_picker(title, items)
           actions.close(prompt_bufnr)
           if not selection or not selection.value then return end
 
-          local target = selection.value
-          vim.cmd(("edit %s"):format(vim.fn.fnameescape(target.filename)))
-          vim.api.nvim_win_set_cursor(0, { target.lnum, math.max((target.col or 1) - 1, 0) })
+          jump_to_item(selection.value)
         end)
 
         return true
@@ -269,6 +275,49 @@ local function collect_reference_items(results)
   end
 
   return items
+end
+
+local function collect_location_items(results)
+  local items = {}
+
+  for client_id, response in pairs(results or {}) do
+    if response and response.err then
+      local message = response.err.message or tostring(response.err)
+      vim.notify(message, vim.log.levels.ERROR)
+    elseif response and response.result then
+      local client = vim.lsp.get_client_by_id(client_id)
+      local position_encoding = client and client.offset_encoding or "utf-16"
+      vim.list_extend(items, vim.lsp.util.locations_to_items(response.result, position_encoding))
+    end
+  end
+
+  return dedupe_items(items)
+end
+
+local function handle_location_items(title, empty_message, items)
+  if vim.tbl_isempty(items) then
+    vim.notify(empty_message, vim.log.levels.INFO)
+    return
+  end
+
+  if #items == 1 then
+    jump_to_item(items[1])
+    return
+  end
+
+  open_items_in_picker(title, items)
+end
+
+local function show_symbol_implementations()
+  local bufnr = vim.api.nvim_get_current_buf()
+  local win = vim.api.nvim_get_current_win()
+
+  vim.lsp.buf_request_all(bufnr, "textDocument/implementation", function(client)
+    return vim.lsp.util.make_position_params(win, client.offset_encoding)
+  end, function(results)
+    local items = collect_location_items(results)
+    handle_location_items("Implementations", "No implementations found", items)
+  end)
 end
 
 local function get_typescript_progress()
@@ -594,7 +643,7 @@ local function goto_source_definition_or_implementation()
   end
 
   if not vim.tbl_contains(ts_source_definition_filetypes, filetype) then
-    return vim.lsp.buf.implementation()
+    return show_symbol_implementations()
   end
 
   local fallback = vim.lsp.buf.definition
