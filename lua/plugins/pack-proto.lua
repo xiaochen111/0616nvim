@@ -18,7 +18,7 @@ return {
     opts = {
       ---@diagnostic disable: missing-fields
       config = {
-        bufls = {
+        buf_ls = {
           filetypes = { "proto" },
           single_file_support = true,
         },
@@ -49,7 +49,7 @@ return {
     "williamboman/mason-lspconfig.nvim",
     optional = true,
     opts = function(_, opts)
-      opts.ensure_installed = require("astrocore").list_insert_unique(opts.ensure_installed, { "bufls" })
+      opts.ensure_installed = require("astrocore").list_insert_unique(opts.ensure_installed, { "buf_ls" })
     end,
   },
   {

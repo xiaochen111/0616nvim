@@ -1,23 +1,23 @@
 return {
   "AstroNvim/astrocore",
   opts = function(_, opts)
-    -- 设置系统剪贴板
-    vim.opt.clipboard = "unnamed"
+    local osc52 = require "vim.ui.clipboard.osc52"
 
-    -- 创建 TextYankPost 自动命令
-    vim.api.nvim_create_autocmd("TextYankPost", {
-      group = vim.api.nvim_create_augroup("Yank", { clear = true }),
-      callback = function()
-        if vim.v.event.operator == "y" then
-          local text = vim.fn.getreg("0")
-          local encoded = vim.fn.system("base64 -w0", text)
-          encoded = vim.fn.trim(encoded)
-          local osc = string.format("\027]52;c;%s\027\\", encoded)
-          io.stderr:write(osc)
-        end
-      end,
-    })
+    vim.g.clipboard = {
+      name = "OSC 52",
+      copy = {
+        ["+"] = osc52.copy "+",
+        ["*"] = osc52.copy "*",
+      },
+      paste = {
+        ["+"] = osc52.paste "+",
+        ["*"] = osc52.paste "*",
+      },
+    }
+
+    -- Route yanks through the configured clipboard provider.
+    vim.opt.clipboard = "unnamedplus"
 
     return opts
   end,
-} 
+}

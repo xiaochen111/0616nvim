@@ -385,9 +385,7 @@ function M.log_variable()
 end
 
 function M.copy_to_osc52(text)
-  local encoded = vim.fn.system("base64 -w0", text)
-  encoded = vim.fn.trim(encoded)
-  io.stderr:write(string.format("\027]52;c;%s\027\\", encoded))
+  require("vim.ui.clipboard.osc52").copy("+")(type(text) == "table" and text or vim.split(text, "\n", { plain = true }))
 end
 
 function M.lsp_buf_debug()
