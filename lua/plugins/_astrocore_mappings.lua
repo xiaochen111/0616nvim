@@ -35,6 +35,10 @@ return {
 
       maps.n.n = { require("utils").better_search "n", desc = "Next search" }
       maps.n.N = { require("utils").better_search "N", desc = "Previous search" }
+      -- 恢复常用的悬浮终端快捷键，并覆盖 Astro 默认的 theme picker。
+      maps.n["<Leader>ft"] = { "<Cmd>ToggleTerm direction=float<CR>", desc = "ToggleTerm float" }
+      -- 在终端模式下连按两次 Esc，退出终端输入并关闭当前悬浮终端。
+      maps.t["<Esc><Esc>"] = { "<C-\\><C-n><Cmd>ToggleTerm direction=float<CR>", desc = "Close floating terminal" }
 
       maps.v["K"] = { ":move '<-2<CR>gv-gv", desc = "Move line up", silent = true }
       maps.v["J"] = { ":move '>+1<CR>gv-gv", desc = "Move line down", silent = true }
