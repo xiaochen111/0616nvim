@@ -13,6 +13,26 @@ return {
         if is_available "telescope.nvim" then
           maps.v["<Leader>f"] = { desc = "󰍉 Find" }
           maps.n["<Leader>fT"] = { "<cmd>TodoTelescope<cr>", desc = "Find TODOs" }
+          -- fo 最近文件：只展示当前工作目录下的历史文件，避免跨项目混在一起
+          maps.n["<Leader>fo"] = {
+            function() require("telescope.builtin").oldfiles { cwd_only = true } end,
+            desc = "Find history files in current project",
+          }
+          -- fw 纯文本全局搜索：给 ripgrep 加 -F(fixed-string)，输入什么就搜什么，
+          -- 括号、点、星号等特殊字符按字面匹配，不再当正则解析
+          maps.n["<Leader>fw"] = {
+            function()
+              require("telescope.builtin").live_grep {
+                additional_args = function() return { "-F" } end,
+              }
+            end,
+            desc = "全局搜索文字(纯文本)",
+          }
+          -- fW 正则全局搜索：保留默认 live_grep 行为，输入按正则表达式解析
+          maps.n["<Leader>fW"] = {
+            function() require("telescope.builtin").live_grep() end,
+            desc = "全局搜索文字(正则)",
+          }
           -- buffer switching
           maps.n["<Leader>bt"] = {
             function()

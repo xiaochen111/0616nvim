@@ -752,4 +752,5 @@ return {
 
 -- leader fo 打开最近的文件
 -- leader ff 打开文件搜索
--- leader fw 全局搜索文字
+-- leader fw 全局搜索文字(纯文本，特殊字符按字面匹配)
+-- leader fW 全局搜索文字(正则)
