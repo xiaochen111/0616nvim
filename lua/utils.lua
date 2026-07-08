@@ -209,10 +209,28 @@ function M.toggle_claude_cli()
     restore_terminal_navigation()
   end
 
+  -- 关闭 Claude 侧边栏时只隐藏窗口，保留终端会话，便于再次打开继续使用。
+  local function hide_window()
+    if state.win and vim.api.nvim_win_is_valid(state.win) then vim.api.nvim_win_close(state.win, true) end
+    state.win = nil
+    restore_terminal_navigation()
+  end
+
+  -- 记录 Claude 窗口离开事件，避免下次切换时误判旧窗口仍可用。
+  local function track_window_close()
+    vim.api.nvim_create_autocmd("BufWinLeave", {
+      buffer = state.buf,
+      once = true,
+      callback = function()
+        state.win = nil
+        restore_terminal_navigation()
+      end,
+    })
+  end
+
   return function()
     if state.win and vim.api.nvim_win_is_valid(state.win) then
-      vim.api.nvim_win_close(state.win, true)
-      clear_state()
+      hide_window()
       return
     end
 
@@ -225,12 +243,19 @@ function M.toggle_claude_cli()
     state.win = vim.api.nvim_get_current_win()
     vim.api.nvim_win_set_width(state.win, math.min(80, math.max(60, vim.o.columns - 20)))
 
+    if state.buf and vim.api.nvim_buf_is_valid(state.buf) then
+      vim.api.nvim_win_set_buf(state.win, state.buf)
+      track_window_close()
+      vim.cmd "startinsert"
+      return
+    end
+
     state.buf = vim.api.nvim_create_buf(false, true)
     vim.api.nvim_win_set_buf(state.win, state.buf)
-    vim.bo[state.buf].bufhidden = "wipe"
+    vim.bo[state.buf].bufhidden = "hide"
     vim.bo[state.buf].filetype = "claude"
 
-    state.job = vim.fn.termopen("claude", {
+    state.job = vim.fn.termopen("claude --continue", {
       on_exit = function()
         vim.schedule(function()
           if state.win and vim.api.nvim_win_is_valid(state.win) then vim.api.nvim_win_close(state.win, true) end
@@ -245,11 +270,7 @@ function M.toggle_claude_cli()
       if not target then return end
       vim.api.nvim_set_current_win(target)
     end, { buffer = state.buf, silent = true, noremap = true, desc = "Focus editable window or Neo-tree" })
-    vim.api.nvim_create_autocmd("BufWinLeave", {
-      buffer = state.buf,
-      once = true,
-      callback = clear_state,
-    })
+    track_window_close()
 
     vim.cmd "startinsert"
   end
