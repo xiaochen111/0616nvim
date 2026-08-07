@@ -74,6 +74,21 @@ return {
         end)
       end
 
+      -- 过滤 java-test 中不能作为 Eclipse bundle 加载的运行时 JAR，并移除重复软链接。
+      local seen_bundles = {}
+      opts.init_options = opts.init_options or {}
+      opts.init_options.bundles = vim.tbl_filter(function(path)
+        local name = vim.fs.basename(path)
+        if name == "com.microsoft.java.test.runner-jar-with-dependencies.jar" or name == "jacocoagent.jar" then
+          return false
+        end
+
+        local realpath = vim.uv.fs_realpath(path) or path
+        if seen_bundles[realpath] then return false end
+        seen_bundles[realpath] = true
+        return true
+      end, opts.init_options.bundles or {})
+
       opts.settings = opts.settings or {}
       opts.settings.java = opts.settings.java or {}
       opts.settings.java.configuration = opts.settings.java.configuration or {}

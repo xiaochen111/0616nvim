@@ -14,7 +14,7 @@ return {
           on_attach = function()
             set_mappings({
               n = {
-                ["K"] = {
+                ["gh"] = {
                   function()
                     if vim.fn.expand "%:t" == "Cargo.toml" and require("crates").popup_available() then
                       require("crates").show_popup()
@@ -22,7 +22,7 @@ return {
                       vim.lsp.buf.hover()
                     end
                   end,
-                  desc = "Show Crate Documentation",
+                  desc = "Show TOML documentation",
                 },
               },
             }, { buffer = true })

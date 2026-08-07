@@ -726,7 +726,10 @@ return {
         --    require("telescope.builtin").lsp_references
         -- },
         ["gd"] = {
-           function() require("telescope.builtin").lsp_definitions() end,
+           function()
+             if vim.bo.filetype == "java" then return require("java_definition").goto_definition() end
+             require("telescope.builtin").lsp_definitions()
+           end,
            cond = "textDocument/definition",
         },
         ["<Leader>m"] = {
