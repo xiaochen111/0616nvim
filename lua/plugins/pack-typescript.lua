@@ -11,21 +11,6 @@ local function ts_project_root(fname)
   return root_pattern(fname) or vim.fs.dirname(fname)
 end
 
-local function eslint_project_root(fname)
-  local root_pattern = require("lspconfig").util.root_pattern(
-    "eslint.config.js",
-    "eslint.config.cjs",
-    "eslint.config.mjs",
-    "eslint.config.ts",
-    ".eslintrc",
-    ".eslintrc.js",
-    ".eslintrc.cjs",
-    ".eslintrc.json",
-    "package.json"
-  )
-  return root_pattern(fname) or ts_project_root(fname)
-end
-
 local function decode_json(filename)
   -- Open the file in read mode
   local file = io.open(filename, "r")
@@ -99,21 +84,33 @@ return {
     ---@diagnostic disable: missing-fields
     opts = {
       autocmds = {
-        eslint_fix_on_save = {
-          cond = function(client) return client.name == "eslint" and vim.fn.exists ":EslintFixAll" > 0 end,
+        biome_fix_on_save = {
+          cond = function(client) return client.name == "biome" end,
           {
             event = "BufWritePost",
-            desc = "Fix all eslint errors",
-            callback = function() vim.cmd.EslintFixAll() end,
+            desc = "Apply Biome safe fixes after saving",
+            callback = function(args)
+              local client = vim.lsp.get_clients { bufnr = args.buf, name = "biome" }[1]
+              if not client or not client.config.cmd[1] then return end
+
+              local filename = vim.api.nvim_buf_get_name(args.buf)
+              if filename == "" then return end
+
+              -- 在 LSP 根目录执行，兼容子应用 biome.json 中的 root: false 配置。
+              local result = vim.system({ client.config.cmd[1], "check", "--write", "--unsafe", filename }, {
+                cwd = client.config.root_dir,
+                text = true,
+              }):wait()
+              if result.code > 1 then vim.notify("Biome 保存修复失败", vim.log.levels.WARN) end
+
+              vim.api.nvim_buf_call(args.buf, function() vim.cmd "silent! checktime" end)
+            end,
           },
         },
       },
       config = {
-        eslint = {
-          root_dir = eslint_project_root,
-          settings = {
-            workingDirectory = { mode = "location" },
-          },
+        biome = {
+          root_dir = require("lspconfig").util.root_pattern("biome.json", "biome.jsonc"),
         },
         vtsls = {
           root_dir = ts_project_root,
@@ -151,6 +148,8 @@ return {
               },
             },
             vtsls = {
+              -- TS 7 开发版暂不包含 tsserver，补全使用 vtsls 内置的稳定 TypeScript。
+              autoUseWorkspaceTsdk = false,
               enableMoveToFileCodeAction = true,
             },
           },
@@ -175,7 +174,7 @@ return {
         "neovim/nvim-lspconfig",
     },
     opts = function(_, opts)
-      opts.ensure_installed = require("astrocore").list_insert_unique(opts.ensure_installed or {}, { "eslint", "vtsls" })
+      opts.ensure_installed = require("astrocore").list_insert_unique(opts.ensure_installed or {}, { "biome", "vtsls" })
       opts.automatic_installation = false
       opts.handlers = opts.handlers or {}
       -- Prefer vtsls for TS/JS and prevent Mason from auto-setting up ts_ls

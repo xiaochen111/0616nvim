@@ -10,10 +10,15 @@ local function mapping(is_cmdline)
 
   return {
     ["<CR>"] = cmp.config.disable,
-    -- 禁用了tab键 选择下一个的行为
+    -- Tab（终端中的 Ctrl+I）用于主动唤起补全。
     ["<Tab>"] = cmp.mapping(function(fallback)
-      -- 直接执行默认的 Tab 键行为
-      fallback()
+      if cmp.visible() then
+        cmp.select_next_item { behavior = cmp.SelectBehavior.Select }
+      elseif not is_cmdline and luasnip.expand_or_jumpable() then
+        luasnip.expand_or_jump()
+      else
+        cmp.complete()
+      end
     end, { "i", "c" }),
     -- ctrl + e close cmp window
     -- <C-n> and <C-p> for navigating snippets

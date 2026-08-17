@@ -709,7 +709,9 @@ return {
     -- Configuration options for controlling formatting with language servers
     formatting = {
       -- control auto formatting on save
-      format_on_save = false,
+      format_on_save = { enabled = true },
+      -- 前端文件保存时仅由 Biome 格式化，避免与 null-ls 的 Prettier 或 vtsls 重复处理。
+      filter = function(client) return client.name == "biome" end,
       -- disable formatting capabilities for specific language servers
       disabled = {},
       -- default format timeout
