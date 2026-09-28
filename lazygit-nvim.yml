@@ -1,0 +1,5 @@
+# 仅在 Neovim 的浮动终端内加载，让 Lazygit 的 e 回到当前 Neovim。
+os:
+  editPreset: nvim-remote
+  # 覆盖全局配置里的 `nvim {{filename}}`，避免它盖过远程预设。
+  edit: '[ -z "$NVIM" ] && (nvim -- {{filename}}) || (nvim --server "$NVIM" --remote-send "q" && nvim --server "$NVIM" --remote-tab {{filename}})'

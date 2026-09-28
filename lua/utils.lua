@@ -308,8 +308,17 @@ end
 function M.toggle_lazy_git()
   return function()
     local worktree = require("astrocore").file_worktree()
-    local flags = worktree and (" --work-tree=%s --git-dir=%s"):format(worktree.toplevel, worktree.gitdir) or ""
-    local lazygit_cmd = "lazygit " .. flags
+    -- 只给 Neovim 内启动的 Lazygit 使用远程编辑预设，保留独立启动时的配置。
+    local config_dir = vim.fn.trim(vim.fn.system { "lazygit", "--print-config-dir" })
+    local config_files = {}
+    local global_config = config_dir .. "/config.yml"
+    if vim.fn.filereadable(global_config) == 1 then table.insert(config_files, global_config) end
+    table.insert(config_files, vim.fn.stdpath("config") .. "/lazygit-nvim.yml")
+    local lazygit_cmd = { "lazygit", "--use-config-file", table.concat(config_files, ",") }
+    if worktree then
+      table.insert(lazygit_cmd, "--work-tree=" .. worktree.toplevel)
+      table.insert(lazygit_cmd, "--git-dir=" .. worktree.gitdir)
+    end
 
     -- 计算浮动窗口的尺寸
     local width = math.floor(vim.o.columns * 0.8)
