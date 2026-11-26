@@ -46,6 +46,11 @@ return {
       maps.i["<C-S>"] = { "<esc>:w<cr>a", desc = "Save file", silent = true }
       maps.x["<C-S>"] = { "<esc>:w<cr>a", desc = "Save file", silent = true }
       maps.n["<C-S>"] = { "<Cmd>w<cr>", desc = "Save file", silent = true }
+      -- iTerm2 的 Cmd+S 也用 Send Escape Sequence，填 `[115;9u`（自动加 ESC）。
+      -- 直接执行保存，插入和可视模式下也能继续当前操作。
+      maps.n["<D-s>"] = maps.n["<C-S>"]
+      maps.i["<D-s>"] = maps.n["<C-S>"]
+      maps.x["<D-s>"] = maps.n["<C-S>"]
       maps.n["<C-l>"] = { function() require("utils").focus_right_claude_or_window() end, desc = "Focus right Claude or window" }
 
       -- Cmd+P 沿用 Leader+ff 的文件搜索，编辑时也能直接打开。
@@ -76,8 +81,6 @@ return {
       if vim.g.neovide then
         if system == "Darwin" then
           vim.g.neovide_input_use_logo = 1 -- enable use of the logo (cmd) key
-          -- Save
-          maps.n["<D-s>"] = ":w<CR>"
           -- Paste normal mode
           maps.n["<D-v>"] = '"+P'
           -- Copy
