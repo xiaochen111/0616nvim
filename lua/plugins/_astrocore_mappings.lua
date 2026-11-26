@@ -18,6 +18,52 @@ local function toggle_gitsigns_blame()
   require("gitsigns").blame()
 end
 
+-- 搜索框为空时，优先展示当前文件、已打开文件和最近打开过的项目文件。
+local function find_project_files()
+  local builtin = require "telescope.builtin"
+  local cwd = vim.uv.cwd()
+  local ranks, next_rank = {}, 1
+
+  -- 用项目相对路径给文件排名，同一个文件只保留最靠前的位置。
+  local function prioritize(file)
+    if file == "" then return end
+    local relative = vim.fs.relpath(cwd, file)
+    if not relative or ranks[relative] then return end
+    ranks[relative] = next_rank
+    next_rank = next_rank + 1
+  end
+
+  if vim.bo.buftype == "" then prioritize(vim.api.nvim_buf_get_name(0)) end
+
+  local buffers = vim.fn.getbufinfo()
+  table.sort(buffers, function(a, b)
+    if a.listed ~= b.listed then return a.listed > b.listed end
+    if a.lastused ~= b.lastused then return a.lastused > b.lastused end
+    return a.bufnr > b.bufnr
+  end)
+  for _, buffer in ipairs(buffers) do
+    if (buffer.listed == 1 or buffer.lastused > 0) and vim.bo[buffer.bufnr].buftype == "" then
+      prioritize(buffer.name)
+    end
+  end
+  for _, file in ipairs(vim.v.oldfiles) do
+    prioritize(file)
+  end
+
+  local sorter = require("telescope.config").values.file_sorter {}
+  local fuzzy_score = sorter.scoring_function
+  -- 只给空搜索应用文件优先级，有关键词时交给原来的模糊匹配评分。
+  function sorter:scoring_function(prompt, ordinal, ...)
+    if prompt == "" then
+      local path = vim.fs.normalize(ordinal, { expand_env = false })
+      return (ranks[path] or next_rank) / next_rank
+    end
+    return fuzzy_score(self, prompt, ordinal, ...)
+  end
+
+  builtin.find_files { sorter = sorter }
+end
+
 return {
   "AstroNvim/astrocore",
   ---@param opts AstroCoreOpts
@@ -58,6 +104,7 @@ return {
       -- 动作选 Send Escape Sequence，内容填 `[112;9u`。iTerm2 会自动加上 ESC，
       -- Neovim 收到完整序列后才会识别为 <D-p>。
       local find_files = maps.n["<Leader>ff"]
+      if find_files then find_files[1] = find_project_files end
       maps.n["<D-p>"] = find_files
       maps.i["<D-p>"] = find_files
       maps.x["<D-p>"] = find_files
