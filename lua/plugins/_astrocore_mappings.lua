@@ -48,6 +48,12 @@ return {
       maps.n["<C-S>"] = { "<Cmd>w<cr>", desc = "Save file", silent = true }
       maps.n["<C-l>"] = { function() require("utils").focus_right_claude_or_window() end, desc = "Focus right Claude or window" }
 
+      -- Cmd+P 沿用 Leader+ff 的文件搜索，编辑时也能直接打开。
+      local find_files = maps.n["<Leader>ff"]
+      maps.n["<D-p>"] = find_files
+      maps.i["<D-p>"] = find_files
+      maps.x["<D-p>"] = find_files
+
       maps.n["<Leader>wo"] = { "<C-w>o", desc = "Close other screen" }
       maps.v["p"] = { "pgvy", desc = "Paste" }
 
