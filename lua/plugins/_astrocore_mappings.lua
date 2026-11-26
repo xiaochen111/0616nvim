@@ -49,6 +49,9 @@ return {
       maps.n["<C-l>"] = { function() require("utils").focus_right_claude_or_window() end, desc = "Focus right Claude or window" }
 
       -- Cmd+P 沿用 Leader+ff 的文件搜索，编辑时也能直接打开。
+      -- iTerm2 默认用 Cmd+P 打印，需要在当前 Profile 的 Keys → Key Mappings 中添加 Cmd+P。
+      -- 动作选 Send Escape Sequence，内容填 `[112;9u`。iTerm2 会自动加上 ESC，
+      -- Neovim 收到完整序列后才会识别为 <D-p>。
       local find_files = maps.n["<Leader>ff"]
       maps.n["<D-p>"] = find_files
       maps.i["<D-p>"] = find_files
