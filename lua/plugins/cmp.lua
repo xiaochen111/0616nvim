@@ -130,10 +130,19 @@ return {
       dependencies = { "hrsh7th/nvim-cmp" },
       opts = function()
         local cmp = require "cmp"
+        local search_mapping = mapping(true)
+        -- 搜索框里的字母用于输入，候选可用 Tab 或方向键选择。
+        local insert_search_text = cmp.mapping(function(fallback) fallback() end, { "c" })
+        search_mapping["J"] = insert_search_text
+        search_mapping["K"] = insert_search_text
+        -- 只确认主动选中的候选，否则回车直接执行原生搜索。
+        search_mapping["<CR>"] = cmp.mapping(cmp.mapping.confirm { select = false }, { "c" })
         return {
           {
             type = "/",
-            mapping = mapping(true),
+            mapping = search_mapping,
+            preselect = cmp.PreselectMode.None,
+            completion = { completeopt = "menu,menuone,noinsert,noselect" },
             sources = {
               { name = "buffer" },
             },
